@@ -44,7 +44,7 @@ def printData(data):
 endPoint = "https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo"
 
 params = {
-    'serviceKey': '79q0SKoHP/mpdu8C5Z1Ox9TMHKcPf8+suloysjNhmPmCamXI1eunTRfE/NxNPomTgvCIguz+05jk3s43Qg71nA==',
+    'serviceKey': '여기에 발급받은 서비스 키',
     'numOfRows': 1000, # 한 페이지 결과 수
     'pageNo': 1, # 페이지 번호
     'resultType': 'json', # 구분(xml, json) Default: xml
