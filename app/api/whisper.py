@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File
 from pydantic import BaseModel
 import pandas as pd
 from app.services.whisper_service import transcribe
+from app.services.nlp_service import extract_period
 
 router = APIRouter(prefix="/api/whisper", tags=["Whisper"])
 
@@ -47,9 +48,20 @@ def parse_query(request: QueryRequest):
     entity = find_stock_name(text)
     intent = classify_intent(text)
     code = df[df['name'] == entity]['code'].values[0] if entity else None
+    period = extract_period(text)
+
+    if intent == "차트 조회" and period is None:
+        return {
+            "entity": entity or "미인식",
+            "intent": intent,
+            "code": code or "미확인",
+            "period": None,
+            "message": "기간을 말씀해주세요. 일주일, 한달, 3개월, 1년, 5년 중 선택 가능합니다."
+        }
 
     return {
         "entity": entity or "미인식",
         "intent": intent,
-        "code": code or "미확인"
+        "code": code or "미확인",
+        "period": period
     }

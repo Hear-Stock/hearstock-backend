@@ -12,7 +12,7 @@ async def transcribe(file: UploadFile) -> str:
     with open(temp_filename, "wb") as f:
         f.write(contents)
 
-    result = model.transcribe(temp_filename) # whisper로 텍스트 변환환
+    result = model.transcribe(temp_filename) # whisper로 텍스트 변환
 
     os.remove(temp_filename)
 
