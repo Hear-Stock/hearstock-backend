@@ -7,10 +7,10 @@ from app.services.nlp_service import extract_period
 router = APIRouter(prefix="/api/whisper", tags=["Whisper"])
 
 # whisper 음성 텍스트 변환
-@router.post("/transcribe")
-async def handle_transcribe(file: UploadFile):
-    text = await transcribe(file)
-    return {"text": text}
+# @router.post("/transcribe")
+# async def handle_transcribe(file: UploadFile):
+#     text = await transcribe(file)
+#     return {"text": text}
 
 df = pd.read_csv("stock_list.csv", encoding="cp949")
 df = df[['종목명', '종목코드']]
@@ -21,10 +21,11 @@ class QueryRequest(BaseModel):
     text: str
 
 def find_stock_name(text: str):
-    for name in df['name']:
+    sorted_names = sorted(df['name'], key=lambda x: len(x), reverse=True)
+    for name in sorted_names:
         if name in text:
             return name
-    for name in df['name']:
+    for name in sorted_names:
         if name.startswith(text.strip()):
             return name
     return None
@@ -38,6 +39,8 @@ def classify_intent(text: str):
         return "상한가 조회"
     elif "하한가" in text:
         return "하한가 조회"
+    elif "주식" in text or "종목" in text:
+        return "실시간 차트 조회"
     else:
         return "기타"
 
