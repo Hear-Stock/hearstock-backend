@@ -1,16 +1,9 @@
 from fastapi import APIRouter, UploadFile, File
 from pydantic import BaseModel
 import pandas as pd
-from app.services.whisper_service import transcribe
 from app.services.nlp_service import extract_period
 
 router = APIRouter(prefix="/api/whisper", tags=["Whisper"])
-
-# whisper 음성 텍스트 변환
-# @router.post("/transcribe")
-# async def handle_transcribe(file: UploadFile):
-#     text = await transcribe(file)
-#     return {"text": text}
 
 df = pd.read_csv("stock_list.csv", encoding="cp949")
 df = df[['종목명', '종목코드']]
@@ -59,7 +52,7 @@ def parse_query(request: QueryRequest):
             "intent": intent,
             "code": code or "미확인",
             "period": None,
-            "message": "기간을 말씀해주세요. 일주일, 한달, 3개월, 1년, 5년 중 선택 가능합니다."
+            "message": "기간을 말씀해주세요. 일주일, 한달, 3개월, 1년, 5년, 전체 중 선택 가능합니다."
         }
 
     return {

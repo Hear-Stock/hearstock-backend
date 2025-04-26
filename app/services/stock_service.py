@@ -2,7 +2,6 @@ import requests
 import pandas as pd
 from io import StringIO
 from bs4 import BeautifulSoup
-from datetime import timedelta
 
 # 주가 조회
 def get_current_price(code: str) -> str:
@@ -57,7 +56,7 @@ def get_price_summary(code: str) -> dict:
     }
 
 # 차트 조회 
-def get_chart_data(code: str, day_range: int = 30) -> pd.DataFrame:
+def get_chart_data(code: str, days: int = None) -> pd.DataFrame:
     base_url = f"https://finance.naver.com/item/sise_day.naver?code={code}"
     headers = {
         "User-Agent": "Mozilla/5.0",
@@ -65,7 +64,7 @@ def get_chart_data(code: str, day_range: int = 30) -> pd.DataFrame:
     }
 
     dfs = []
-    pages = 60  
+    pages = 500  # 넉넉하게 확보
 
     for page in range(1, pages + 1):
         url = f"{base_url}&page={page}"
@@ -87,8 +86,22 @@ def get_chart_data(code: str, day_range: int = 30) -> pd.DataFrame:
     df_all['날짜'] = pd.to_datetime(df_all['날짜'])
     df_all = df_all.sort_values("날짜")
 
-    end_date = pd.Timestamp.today().normalize()
-    start_date = end_date - timedelta(days=day_range)
+    # 숫자 변환
+    df_all['종가'] = df_all['종가'].astype(str).str.replace(',', '').astype(float)
 
-    df_filtered = df_all[(df_all['날짜'] >= start_date) & (df_all['날짜'] <= end_date)]
-    return df_filtered.reset_index(drop=True)
+    # 날짜 요일 붙이기
+    weekday_map = {
+        'Mon': '월', 'Tue': '화', 'Wed': '수', 'Thu': '목',
+        'Fri': '금', 'Sat': '토', 'Sun': '일'
+    }
+    df_all['날짜'] = df_all['날짜'].apply(
+        lambda x: x.strftime('%Y-%m-%d') + f"({weekday_map[x.strftime('%a')]})"
+    )
+
+    # days가 주어졌다면 날짜 필터링
+    if days:
+        today = pd.Timestamp.today().normalize()
+        start_date = today - pd.Timedelta(days=days)
+        df_all = df_all[df_all['날짜'].apply(lambda x: pd.to_datetime(x[:10])) >= start_date]
+
+    return df_all.reset_index(drop=True)
