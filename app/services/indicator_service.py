@@ -2,6 +2,8 @@ import requests
 from bs4 import BeautifulSoup
 import re
 
+# 투자지표 api
+
 # 숫자 추출 및 소수점 1자리 반올림
 def extract_number(text: str) -> str:
     numbers = re.findall(r'\d+\.?\d*', text.replace(',', ''))

@@ -1,6 +1,6 @@
+# 3달, 1년, 5년 전체 차트 조회
+
 import requests
-import pandas as pd
-from io import StringIO
 from bs4 import BeautifulSoup
 
 # 주가 조회
@@ -56,52 +56,58 @@ def get_price_summary(code: str) -> dict:
     }
 
 # 차트 조회 
-def get_chart_data(code: str, days: int = None) -> pd.DataFrame:
-    base_url = f"https://finance.naver.com/item/sise_day.naver?code={code}"
+def get_daily_stock_data(stock_code: str, page: int = 1):
+    url = f"https://finance.naver.com/item/sise_day.naver?code={stock_code}&page={page}"
     headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Referer": f"https://finance.naver.com/item/main.naver?code={code}"
+        "User-Agent": "Mozilla/5.0"
     }
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
 
-    dfs = []
-    pages = 500  # 넉넉하게 확보
+    table = soup.select_one("table.type2")
+    if not table:
+        return []
 
-    for page in range(1, pages + 1):
-        url = f"{base_url}&page={page}"
-        res = requests.get(url, headers=headers)
-        soup = BeautifulSoup(res.text, "html.parser")
-        table = soup.find("table", class_="type2")
-        if table:
-            try:
-                df = pd.read_html(StringIO(str(table)))[0]
-                dfs.append(df)
-            except Exception:
-                continue
+    rows = table.select("tr")
+    temp_data = []
 
-    if not dfs:
-        raise ValueError("크롤링 실패: 시세 데이터 없음")
+    for row in rows:
+        cols = row.select("td")
+        if len(cols) >= 7:
+            date = cols[0].text.strip()
+            close = cols[1].text.strip().replace(",", "")
+            open_price = cols[3].text.strip().replace(",", "")
+            high = cols[4].text.strip().replace(",", "")
+            low = cols[5].text.strip().replace(",", "")
+            volume = cols[6].text.strip().replace(",", "")
 
-    df_all = pd.concat(dfs).dropna()
-    df_all.columns = ['날짜', '종가', '전일비', '시가', '고가', '저가', '거래량']
-    df_all['날짜'] = pd.to_datetime(df_all['날짜'])
-    df_all = df_all.sort_values("날짜")
+            if date and close and open_price and high and low and volume:
+                try:
+                    temp_data.append({
+                        "date": date,
+                        "end": int(close),
+                        "start": int(open_price),
+                        "high": int(high),
+                        "low": int(low),
+                        "trading_volume": int(volume),
+                    })
+                except ValueError:
+                    # 만약 데이터가 비정상 (예: 하이픈 '-' 같은 경우)이면 무시
+                    continue
 
-    # 숫자 변환
-    df_all['종가'] = df_all['종가'].astype(str).str.replace(',', '').astype(float)
+    # 여기서 등락률 계산
+    data_list = []
+    for i in range(len(temp_data) - 1):  # 마지막은 전일 종가가 없으니 제외
+        today = temp_data[i]
+        yesterday = temp_data[i + 1]
 
-    # 날짜 요일 붙이기
-    weekday_map = {
-        'Mon': '월', 'Tue': '화', 'Wed': '수', 'Thu': '목',
-        'Fri': '금', 'Sat': '토', 'Sun': '일'
-    }
-    df_all['날짜'] = df_all['날짜'].apply(
-        lambda x: x.strftime('%Y-%m-%d') + f"({weekday_map[x.strftime('%a')]})"
-    )
+        try:
+            prev_close = yesterday["종가"]
+            fluctuation_rate = round(((today["종가"] - prev_close) / prev_close) * 100, 2)
+        except ZeroDivisionError:
+            fluctuation_rate = None
 
-    # days가 주어졌다면 날짜 필터링
-    if days:
-        today = pd.Timestamp.today().normalize()
-        start_date = today - pd.Timedelta(days=days)
-        df_all = df_all[df_all['날짜'].apply(lambda x: pd.to_datetime(x[:10])) >= start_date]
+        today["등락률"] = fluctuation_rate
+        data_list.append(today)
 
-    return df_all.reset_index(drop=True)
+    return data_list

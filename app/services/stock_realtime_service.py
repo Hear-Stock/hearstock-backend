@@ -1,3 +1,5 @@
+# 실시간 차트 조회 api
+
 import websocket
 import threading
 import json
