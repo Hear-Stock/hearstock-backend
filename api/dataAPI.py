@@ -44,17 +44,49 @@ def printData(data):
 endPoint = "https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo"
 
 params = {
-    'serviceKey': '79q0SKoHP/mpdu8C5Z1Ox9TMHKcPf8+suloysjNhmPmCamXI1eunTRfE/NxNPomTgvCIguz+05jk3s43Qg71nA==',
-    'numOfRows': 1000, # 한 페이지 결과 수
-    'pageNo': 1, # 페이지 번호
-    'resultType': 'json', # 구분(xml, json) Default: xml
-    'itmsNm': '삼성전자' # 검색값과 종목명이 일치하는 데이터를 검색
+    'serviceKey': '79q0SKoHP/mpdu8C5Z1Ox9TMHKcPf8+suloysjNhmPmCamXI1eunTRfE/NxNPomTgvCIguz+05jk3s43Qg71nA==',  # 인증용 서비스 키
+    'numOfRows': 1000,  # 한 페이지에 가져올 결과 수
+    'pageNo': 1,  # 페이지 번호
+    'resultType': 'json',  # 응답 형식 (xml 또는 json, 기본값 xml)
+
+    'basDt': '',  # 기준일자 (예: 20220919) - 정확히 일치하는 데이터 검색
+    'beginBasDt': '',  # 기준일자가 지정값보다 크거나 같은 데이터 검색
+    'endBasDt': '',  # 기준일자가 지정값보다 작은 데이터 검색
+    'likeBasDt': '',  # 기준일자값이 포함된 데이터 검색
+
+    'likeSrtnCd': '',  # 단축코드 포함 검색
+    'isinCd': '',  # ISIN 코드가 정확히 일치하는 데이터 검색
+    'likeIsinCd': '',  # ISIN 코드가 포함된 데이터 검색
+
+    'itmsNm': '삼성전자',  # 종목명이 정확히 일치하는 데이터 검색
+    'likeItmsNm': '',  # 종목명이 포함된 데이터 검색
+
+    'mrktCls': '',  # 시장구분 (예: KOSDAQ, KOSPI)
+
+    'beginVs': '',  # 대비가 지정값보다 크거나 같은 데이터 검색
+    'endVs': '',  # 대비가 지정값보다 작은 데이터 검색
+
+    'beginFltRt': '',  # 등락률이 지정값보다 크거나 같은 데이터 검색
+    'endFltRt': '',  # 등락률이 지정값보다 작은 데이터 검색
+
+    'beginTrqu': '',  # 거래량이 지정값보다 크거나 같은 데이터 검색
+    'endTrqu': '',  # 거래량이 지정값보다 작은 데이터 검색
+
+    'beginTrPrc': '',  # 거래대금이 지정값보다 크거나 같은 데이터 검색
+    'endTrPrc': '',  # 거래대금이 지정값보다 작은 데이터 검색
+
+    'beginLstgStCnt': '',  # 상장주식수가 지정값보다 크거나 같은 데이터 검색
+    'endLstgStCnt': '',  # 상장주식수가 지정값보다 작은 데이터 검색
+
+    'beginMrktTotAmt': '',  # 시가총액이 지정값보다 크거나 같은 데이터 검색
+    'endMrktTotAmt': '',  # 시가총액이 지정값보다 작은 데이터 검색
 }
+
 
 response = requests.get(endPoint, params=params)
 data = response.json()
 
-# printData(data)
+printData(data)
 showChart(data)
 
 
