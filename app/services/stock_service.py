@@ -1,7 +1,19 @@
 import requests
+import redis
+import json
 from bs4 import BeautifulSoup
 import yfinance as yf
-import pandas as pd
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+REDIS_HOST = os.getenv("REDIS_HOST")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_DB = int(os.getenv("REDIS_DB", 0))
+
+r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
+print("Redis host:", REDIS_HOST)  # localhost가 출력돼야 함
+
 
 # 해외 현재가 조회
 def get_overseas_price(symbol: str):
@@ -75,9 +87,13 @@ def get_price(code: str, intent: str) -> dict:
         return {"error": f"지원하지 않는 intent: {intent}"}
     
 def get_stock_chart(stock_code: str, period: str):
+    cache_key = f"chart:{stock_code}:{period}"
+    
+    cached_data = r.get(cache_key)
+
     try:
         ticker = yf.Ticker(stock_code)
-        _ = ticker.info  
+        _ = ticker.info
         df = ticker.history(period=period, interval="1d")
     except Exception as e:
         return {"error": f"yfinance error: {e}"}
@@ -101,4 +117,8 @@ def get_stock_chart(stock_code: str, period: str):
     df["fluctuation_rate"] = df["fluctuation_rate"].round(2)
     df = df.dropna()
 
-    return df.to_dict(orient="records")
+    result = df.to_dict(orient="records")
+
+    r.setex(cache_key, 3600, json.dumps(result))
+
+    return result
