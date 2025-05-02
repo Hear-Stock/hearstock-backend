@@ -44,7 +44,6 @@ def printData(data):
 endPoint = "https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo"
 
 params = {
-<<<<<<< HEAD
     'serviceKey': '79q0SKoHP/mpdu8C5Z1Ox9TMHKcPf8+suloysjNhmPmCamXI1eunTRfE/NxNPomTgvCIguz+05jk3s43Qg71nA==',  # 인증용 서비스 키
     'numOfRows': 1000,  # 한 페이지에 가져올 결과 수
     'pageNo': 1,  # 페이지 번호
@@ -81,13 +80,11 @@ params = {
 
     'beginMrktTotAmt': '',  # 시가총액이 지정값보다 크거나 같은 데이터 검색
     'endMrktTotAmt': '',  # 시가총액이 지정값보다 작은 데이터 검색
-=======
     'serviceKey': '여기에 발급받은 서비스 키',
     'numOfRows': 1000, # 한 페이지 결과 수
     'pageNo': 1, # 페이지 번호
     'resultType': 'json', # 구분(xml, json) Default: xml
     'itmsNm': '삼성전자' # 검색값과 종목명이 일치하는 데이터를 검색
->>>>>>> 6210f06b6f0d0c5f08d9201e53c1ed04972fa6bf
 }
 
 
