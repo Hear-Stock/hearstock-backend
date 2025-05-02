@@ -2,3 +2,10 @@ openai>=1.12.0
 python-multipart
 fastapi
 uvicorn
+requests
+beautifulsoup4
+websocket-client
+sqlalchemy
+psycopg2-binary
+pandas
+apscheduler
