@@ -88,12 +88,13 @@ def get_price(code: str, intent: str) -> dict:
     
 def get_stock_chart(stock_code: str, period: str):
     cache_key = f"chart:{stock_code}:{period}"
-    
+
     cached_data = r.get(cache_key)
+    if cached_data:
+        return json.loads(cached_data)
 
     try:
         ticker = yf.Ticker(stock_code)
-        _ = ticker.info
         df = ticker.history(period=period, interval="1d")
     except Exception as e:
         return {"error": f"yfinance error: {e}"}
@@ -114,11 +115,13 @@ def get_stock_chart(stock_code: str, period: str):
     }, inplace=True)
 
     df["fluctuation_rate"] = df["close"].pct_change() * 100
-    df["fluctuation_rate"] = df["fluctuation_rate"].round(2)
+    df["fluctuation_rate"] = df["fluctuation_rate"].round(1)
     df = df.dropna()
 
+    # 정수로 반올림
+    df[["open", "high", "low", "close"]] = df[["open", "high", "low", "close"]].round(0).astype(int)
+
     result = df.to_dict(orient="records")
-
     r.setex(cache_key, 3600, json.dumps(result))
-
+    
     return result
