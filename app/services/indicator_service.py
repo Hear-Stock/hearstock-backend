@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import re
+import yfinance as yf
 
 # 투자지표 api
 
@@ -136,7 +137,7 @@ def crawl_investment_metrics(stock_code: str) -> dict:
 
         return {
             "corp_name": corp_name,
-            "market_cap": str(int(market_cap)),  # 원단위로 표현
+            "market_cap": str(int(market_cap)), 
             "dividend_yield": get_td_by_th_title(soup, "배당수익률"),
             "per": get_td_by_th_title(soup, "PER"),
             "pbr": get_td_by_th_title(soup, "PBR"),
@@ -146,3 +147,28 @@ def crawl_investment_metrics(stock_code: str) -> dict:
         }
     except Exception as e:
         return {"error": str(e)}
+
+def get_us_investment_metrics(symbol: str) -> dict:
+    try:
+        ticker = yf.Ticker(symbol)
+        info = ticker.info
+
+        return {
+            "corp_name": info.get("shortName", symbol),
+            "market_cap": str(info.get("marketCap", "N/A")),
+            "dividend_yield": str(round(info.get("dividendYield", 0) * 100, 2)) if info.get("dividendYield") else "N/A",
+            "per": str(info.get("trailingPE", "N/A")),
+            "pbr": str(info.get("priceToBook", "N/A")),
+            "roe": str(round(info.get("returnOnEquity", 0) * 100, 2)) if info.get("returnOnEquity") else "N/A",
+            "psr": str(info.get("priceToSalesTrailing12Months", "N/A")),
+        }
+    except Exception as e:
+        return {"error": f"yfinance error: {e}"}
+
+def get_investment_metrics(code: str, market: str):
+    if market == "KR":
+        return crawl_investment_metrics(code)  # 네이버 크롤링
+    elif market == "US":
+        return get_us_investment_metrics(code)  # yfinance API
+    else:
+        return {"error": f"Unsupported market: {market}"}

@@ -1,23 +1,24 @@
-# 3달, 1년, 5년 전체 차트 조회
-
 import requests
 from bs4 import BeautifulSoup
+import yfinance as yf
+import pandas as pd
 
-# 주가 조회
-def get_current_price(code: str) -> str:
-    url = f"https://finance.naver.com/item/main.naver?code={code}"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    res = requests.get(url, headers=headers)
-    soup = BeautifulSoup(res.text, "html.parser")
+# 해외 현재가 조회
+def get_overseas_price(symbol: str):
+    import yfinance as yf
+    ticker = yf.Ticker(symbol)
+    data = ticker.history(period="1d", interval="1m")
 
-    try:
-        price = soup.select_one("p.no_today span.blind").text
-        return price
-    except Exception:
-        return "조회 실패"
+    if data.empty:
+        return {"error": f"No data for {symbol}"}
 
-# 상한가, 하한가 조회
-def get_price_summary(code: str) -> dict:
+    return {
+        "code": symbol,
+        "current_price": round(data["Close"].iloc[-1], 2)
+    }
+
+# 국내 상한가, 하한가, 현재가 조회
+def get_domestic_price(code: str) -> dict:
     url = f"https://finance.naver.com/item/main.naver?code={code}"
     headers = {"User-Agent": "Mozilla/5.0"}
     res = requests.get(url, headers=headers)
@@ -55,59 +56,49 @@ def get_price_summary(code: str) -> dict:
         "low_limit": f"{int(low_limit):,}",
     }
 
-# 차트 조회 
-def get_daily_stock_data(stock_code: str, page: int = 1):
-    url = f"https://finance.naver.com/item/sise_day.naver?code={stock_code}&page={page}"
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
+# 주가, 상한가, 하한가 조회
+def get_price(code: str, intent: str) -> dict:
+    summary = get_domestic_price(code)
+    
+    if "error" in summary:
+        return summary
 
-    table = soup.select_one("table.type2")
-    if not table:
-        return []
+    name = summary.get("name")
 
-    rows = table.select("tr")
-    temp_data = []
+    if intent == "current_price":
+        return {"name": name, "current_price": summary.get("current")}
+    elif intent == "high_limit":
+        return {"name": name, "high_limit": summary.get("high_limit")}
+    elif intent == "low_limit":
+        return {"name": name, "low_limit": summary.get("low_limit")}
+    else:
+        return {"error": f"지원하지 않는 intent: {intent}"}
+    
+def get_stock_chart(stock_code: str, period: str):
+    try:
+        ticker = yf.Ticker(stock_code)
+        _ = ticker.info  
+        df = ticker.history(period=period, interval="1d")
+    except Exception as e:
+        return {"error": f"yfinance error: {e}"}
 
-    for row in rows:
-        cols = row.select("td")
-        if len(cols) >= 7:
-            date = cols[0].text.strip()
-            close = cols[1].text.strip().replace(",", "")
-            open_price = cols[3].text.strip().replace(",", "")
-            high = cols[4].text.strip().replace(",", "")
-            low = cols[5].text.strip().replace(",", "")
-            volume = cols[6].text.strip().replace(",", "")
+    if df.empty:
+        return {"error": "No chart data available."}
 
-            if date and close and open_price and high and low and volume:
-                try:
-                    temp_data.append({
-                        "date": date,
-                        "end": int(close),
-                        "start": int(open_price),
-                        "high": int(high),
-                        "low": int(low),
-                        "trading_volume": int(volume),
-                    })
-                except ValueError:
-                    # 만약 데이터가 비정상 (예: 하이픈 '-' 같은 경우)이면 무시
-                    continue
+    df = df.reset_index()
+    df["date"] = df["Date"].dt.strftime("%Y-%m-%d")
+    df = df[["date", "Open", "High", "Low", "Close", "Volume"]]
 
-    # 여기서 등락률 계산
-    data_list = []
-    for i in range(len(temp_data) - 1):  # 마지막은 전일 종가가 없으니 제외
-        today = temp_data[i]
-        yesterday = temp_data[i + 1]
+    df.rename(columns={
+        "Open": "open",
+        "High": "high",
+        "Low": "low",
+        "Close": "close",
+        "Volume": "volume"
+    }, inplace=True)
 
-        try:
-            prev_close = yesterday["종가"]
-            fluctuation_rate = round(((today["종가"] - prev_close) / prev_close) * 100, 2)
-        except ZeroDivisionError:
-            fluctuation_rate = None
+    df["fluctuation_rate"] = df["close"].pct_change() * 100
+    df["fluctuation_rate"] = df["fluctuation_rate"].round(2)
+    df = df.dropna()
 
-        today["등락률"] = fluctuation_rate
-        data_list.append(today)
-
-    return data_list
+    return df.to_dict(orient="records")
