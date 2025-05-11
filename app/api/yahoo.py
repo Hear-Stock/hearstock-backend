@@ -2,8 +2,9 @@ import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 import datetime
+import time
 
-tsla= yf.Ticker("005930.KS")
+
 
 # Date: 특정 기간의 각 거래일을 나타내는 지수입니다.
 # Open: 특정 날짜에 시장이 개장했을 때 주식이 거래되기 시작한 가격입니다.
@@ -18,10 +19,13 @@ tsla= yf.Ticker("005930.KS")
 # print(hist)
 
 
-startDate = datetime.datetime(2015, 4, 8)
-endDate = datetime.datetime(2025, 4, 8)
-stock_data = yf.Ticker('005930.KS')
-stock_df = stock_data.history(start=startDate, end=endDate)
-stock_df['Close'].plot(title="005930.KS stock")
-# plt.show()  
-plt.savefig("plot.png")
+symbol = '005930.KS'
+
+# 기간 설정 (timestamp 형식)
+start = int(time.mktime(datetime.datetime(2010, 1, 1).timetuple()))
+end = int(time.mktime(datetime.datetime.now().timetuple()))
+
+url = f"https://query1.finance.yahoo.com/v7/finance/download/{symbol}?period1={start}&period2={end}&interval=1d&events=history"
+
+df = pd.read_csv(url)
+print(df.head())
