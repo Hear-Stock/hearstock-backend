@@ -12,8 +12,6 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_DB = int(os.getenv("REDIS_DB", 0))
 
 r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
-print("Redis host:", REDIS_HOST)  # localhost가 출력돼야 함
-
 
 # 해외 현재가 조회
 def get_overseas_price(symbol: str):
@@ -85,7 +83,8 @@ def get_price(code: str, intent: str) -> dict:
         return {"name": name, "low_limit": summary.get("low_limit")}
     else:
         return {"error": f"지원하지 않는 intent: {intent}"}
-    
+
+# 차트 조회    
 def get_stock_chart(stock_code: str, period: str):
     cache_key = f"chart:{stock_code}:{period}"
 
