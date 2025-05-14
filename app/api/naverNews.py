@@ -4,13 +4,7 @@ import requests
 네이버 검색 api로 검색어의 검색 결과 불러오기
 """
 
-
-def searchNews(query="삼성전자"
-               ,display = 10
-               , start = 1
-               , sort = 'sim',
-               ):
-
+def searchNews(query="삼성전자", display = 10, start = 1, sort = 'sim'):
     base_url = "https://openapi.naver.com/v1/search/news.json"
     client_id = 'id'
     client_secret = "secret"
@@ -57,9 +51,5 @@ def searchNews(query="삼성전자"
     else:
         print("Error:", response.text)
 
-
 if __name__ == "__main__":
     searchNews()
-
-
-
