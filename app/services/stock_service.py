@@ -122,3 +122,4 @@ def get_stock_chart(stock_code: str, period: str):
     r.setex(cache_key, 3600, json.dumps(result))
 
     return result
+
