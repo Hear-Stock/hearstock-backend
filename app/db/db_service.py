@@ -1,10 +1,14 @@
+import os
+from dotenv import load_dotenv
 import pandas as pd
-import time
 import datetime
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, Float, String, DateTime
 from sqlalchemy.orm import sessionmaker
-from app.config import DB_URL
 from app.api.kiwoomAPI import *
+
+load_dotenv()
+
+DB_URL = os.getenv("DB_URL")
 
 # DB 연결
 engine = create_engine(DB_URL, echo=False)
