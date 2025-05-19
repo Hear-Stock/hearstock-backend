@@ -1,10 +1,18 @@
-import requests
+import os
 
+import requests
+from dotenv import load_dotenv
 """
 네이버 검색 api로 검색어의 검색 결과 불러오기
 """
 
-def searchNews(query="삼성전자", display = 10, start = 1, sort = 'sim'):
+load_dotenv()
+def searchNews(query="삼성전자"
+               ,display = 10
+               , start = 1
+               , sort = 'sim',
+               ):
+
     base_url = "https://openapi.naver.com/v1/search/news.json"
     client_id = 'id'
     client_secret = "secret"
@@ -17,8 +25,8 @@ def searchNews(query="삼성전자", display = 10, start = 1, sort = 'sim'):
         'sort': sort # sim: 정확도순으로 내림차순 정렬(기본값) date: 날짜순으로 내림차순 정렬
     }
 
-    client_id = "qMJH0HY24H3uy6fO5lA7" # naver API ID
-    client_secret = "GwEC7cnhH9" # naver API SECRET KEY
+    client_id = os.getenv("NAVER_CLIENT_ID") # naver API ID
+    client_secret = os.getenv("NAVER_CLIENT_SECRET") # naver API SECRET KEY
 
     # 헤더 설정
     headers = {
@@ -51,5 +59,9 @@ def searchNews(query="삼성전자", display = 10, start = 1, sort = 'sim'):
     else:
         print("Error:", response.text)
 
+
 if __name__ == "__main__":
     searchNews()
+
+
+
