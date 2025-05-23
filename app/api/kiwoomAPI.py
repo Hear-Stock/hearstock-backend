@@ -12,7 +12,7 @@ def accountInfo():
 
     print(accounts)
 
-def getCode(n):# kospi  : 0, kosdaq : 10, etf: 8
+def getCode(kiwoom, n=0):# kospi  : 0, kosdaq : 10, etf: 8
     codes = kiwoom.GetCodeListByMarket(n)
     # print(len(codes), codes)
 
@@ -38,6 +38,8 @@ def basicInfo(code):
     wanted_keys = ['기준가', '시가', '고가', '저가', '현재가']  # 기준가 == 전일종가
     for key in wanted_keys:
         print(f"{key}: {df[key][0]}")
+
+    return df
 
 def sell(accountNumber, code, quantity):
     # 현재가 매수
@@ -101,16 +103,16 @@ def request_ohlcv(kiwoom, code, date):
 if __name__ == '__main__':
     kiwoom = Kiwoom()
     kiwoom.CommConnect(block=True)  # 블록 로그인: 로그인이 완료될 때까지 다음 줄의 코드가 수행되지 않고 블록킹
-    code = '000660'
+    codes = getCode(kiwoom, 10)
 
-    # kiwoom.ocx.dynamicCall("SetRealReg(QString, QString, QString, QString)",
-    #                    "1000", "005930", "10;20", "0")
+    i = 0
+    while (True):
+        if ( i > 11) : break
 
-    df = kiwoom.block_request("opt10001",
-                              종목코드=code,
-                              output="주식기본정보",
-                              next=0)
+        df = basicInfo("005930")
+        print(type(df))
+        print(df['종목명'])
 
-    wanted_keys = ['기준가', '시가', '고가', '저가', '현재가', '등락율']  # 기준가 == 전일종가
-    for key in wanted_keys:
-        print(f"{key}: {df[key][0]}")
+        time.sleep(1)
+        i +=1
+
