@@ -13,7 +13,7 @@ SECRET_KEY = os.getenv("KIWOOM_REST_SECRET")
 MY_ACCESS_TOKEN = os.getenv("KIWOOM_REST_TOKEN")
 
 # 접근토큰 발급
-def get_token():
+def get_kiwoom_token():
 	# 1. 요청할 API URL
 	host = 'https://mockapi.kiwoom.com' # 모의투자
 	# host = 'https://api.kiwoom.com' # 실전투자
@@ -44,7 +44,7 @@ def get_token():
 	return response['token']
 
 # 주식기본정보요청
-def price(token, cont_yn='N', next_key='', code=""):
+def get_kiwoom_stkinfo(token, cont_yn='N', next_key='', code=""):
 	# 1. 요청할 API URL
 	host = 'https://mockapi.kiwoom.com' # 모의투자
 	# host = 'https://api.kiwoom.com' # 실전투자
@@ -150,16 +150,17 @@ def fn_ka10081(token, cont_yn='N', next_key='', code="", date="20250501"):
 
 	
 
-def get_chart(token, code, date="20250501"):
+def get_kiwoom_chart(token, code, date=datetime.now().strftime("%Y%m%d")):
 	all_data = []
 	next_key_val = ""
 	while True:
-		time.sleep(1)
+		time.sleep(0.5)
 		data, next_key_val = fn_ka10081(token=token,
 									   code=code,
 									   date=date,
 									   cont_yn='Y',
 									   next_key=next_key_val)
+
 		if data.empty:
 			break
 		all_data.append(data)  # extend가 아니라 append로 DataFrame 단위로 추가
@@ -195,7 +196,6 @@ def get_chart(token, code, date="20250501"):
 
 	return df_filtered  # DataFrame 리스트를 concat으로 합침
 
-	
 # 주식년봉차트조회요청
 def fn_ka10094(token, cont_yn='N', next_key='', code="", date=datetime.today().strftime('%Y%m%d')):
 	# 1. 요청할 API URL
@@ -231,21 +231,62 @@ def fn_ka10094(token, cont_yn='N', next_key='', code="", date=datetime.today().s
 	data = response.json()  # 전체 응답을 딕셔너리로 파싱
 
 	df = pd.DataFrame(data)
-	# df.to_csv("result.csv", index=False, encoding="utf-8-sig")
 	return df
 	
 
 # 실행 구간
 if __name__ == '__main__':
-	MY_ACCESS_TOKEN = "e20RkrkrJd4nw_v4gop8kIU-i00cf-aWLbPGZjuYqt7O99VSblpWeA3kSzhN8vUGQ9WzwKKxW4KwuGKH6AuVMA"
-
 	# 3. API 실행
-	df = price(token=MY_ACCESS_TOKEN, code="005930")
+	df = get_kiwoom_chart(token=get_kiwoom_token(), code="005930")
 	print(type(df))
-	print(df)
 
-	# next-key, cont-yn 값이 있을 경우
-	# fn_ka10094(token=MY_ACCESS_TOKEN, data=params, cont_yn='Y', next_key='nextkey..')
+	stock_info = {
+		"stk_cd": "종목코드",
+		"stk_nm": "종목명",
+		"setl_mm": "결산월",
+		"fav": "액면가",
+		"cap": "자본금",
+		"flo_stk": "상장주식",
+		"crd_rt": "신용비율",
+		"oyr_hgst": "연중최고",
+		"oyr_lwst": "연중최저",
+		"mac": "시가총액",
+		"mac_wght": "시가총액비중",
+		"for_exh_rt": "외인소진률",
+		"repl_pric": "대용가",
+		"per": "PER",
+		"eps": "EPS",
+		"roe": "ROE",
+		"pbr": "PBR",
+		"ev": "EV",
+		"bps": "BPS",
+		"sale_amt": "매출액",
+		"bus_pro": "영업이익",
+		"cup_nga": "당기순이익",
+		"250hgst": "250최고",
+		"250lwst": "250최저",
+		"high_pric": "고가",
+		"open_pric": "시가",
+		"low_pric": "저가",
+		"upl_pric": "상한가",
+		"lst_pric": "하한가",
+		"base_pric": "기준가",
+		"exp_cntr_pric": "예상체결가",
+		"exp_cntr_qty": "예상체결수량",
+		"250hgst_pric_dt": "250최고가일",
+		"250hgst_pric_pre_rt": "250최고가대비율",
+		"250lwst_pric_dt": "250최저가일",
+		"250lwst_pric_pre_rt": "250최저가대비율",
+		"cur_prc": "현재가",
+		"pre_sig": "대비기호",
+		"pred_pre": "전일대비",
+		"flu_rt": "등락율",
+		"trde_qty": "거래량",
+		"trde_pre": "거래대비",
+		"fav_unit": "액면가단위",
+		"dstr_stk": "유통주식",
+		"dstr_rt": "유통비율"
+	}
 
 	
 
