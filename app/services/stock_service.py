@@ -1,4 +1,5 @@
 import requests
+from curl_cffi import requests
 import redis
 import json
 from bs4 import BeautifulSoup
@@ -12,13 +13,12 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_DB = int(os.getenv("REDIS_DB", 0))
 
 r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
-print("Redis host:", REDIS_HOST)  # localhost가 출력돼야 함
-
 
 # 해외 현재가 조회
 def get_overseas_price(symbol: str):
-    import yfinance as yf
-    ticker = yf.Ticker(symbol)
+    session = requests.Session(impersonate="chrome")
+
+    ticker = yf.Ticker(symbol, session=session)
     data = ticker.history(period="1d", interval="1m")
 
     if data.empty:
@@ -86,13 +86,14 @@ def get_price(code: str, intent: str) -> dict:
     else:
         return {"error": f"지원하지 않는 intent: {intent}"}
     
+    
 def get_stock_chart(stock_code: str, period: str):
     cache_key = f"chart:{stock_code}:{period}"
     
-    cached_data = r.get(cache_key)
+    session = requests.Session(impersonate="chrome")
 
     try:
-        ticker = yf.Ticker(stock_code)
+        ticker = yf.Ticker(stock_code, session=session)
         _ = ticker.info
         df = ticker.history(period=period, interval="1d")
     except Exception as e:
@@ -122,8 +123,3 @@ def get_stock_chart(stock_code: str, period: str):
     r.setex(cache_key, 3600, json.dumps(result))
 
     return result
-
-
-if __name__ == '__main__':
-    print(get_stock_chart("005930.KS", "max"))
-    # print(get_overseas_price("AAPL"))
