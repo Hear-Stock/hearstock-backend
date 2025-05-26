@@ -7,7 +7,17 @@ router = APIRouter(prefix="/api/stock", tags=["Stock"])
 class ChartDirectRequest(BaseModel):
     stock_code: str
     period: str
-    name: str
+    market: str = "KR"
+
+def infer_market(code: str) -> str:
+    return "KR" if code.endswith(".KS") or code.endswith(".KQ") else "US"
+
+def validate_market_match(code: str, market: str) -> bool:
+    if market == "KR" and not (code.endswith(".KS") or code.endswith(".KQ")):
+        return False
+    if market == "US" and (code.endswith(".KS") or code.endswith(".KQ")):
+        return False
+    return True
 
 @router.get("/price")
 def get_price_info(
@@ -26,13 +36,26 @@ def get_price_info(
 
 @router.get("/chart")
 def get_chart_by_query(
-    code: str = Query(..., description="야후 파이낸스 형식의 종목 코드 (예: 005930.KS)"),
-    period: str = Query(..., description="차트 기간 (예: 3mo, 1y 등)")
+    code: str = Query(..., description="야후 파이낸스 형식의 종목 코드 (예: 005930.KS, TSLA)"),
+    period: str = Query(..., description="차트 기간 (예: 3mo, 1y 등)"),
+    market: str = Query(None, description="시장 구분 (KR | US), 생략 시 자동 추론")
 ):
-    return get_stock_chart(code, period)
+    final_market = market or infer_market(code)
+
+    # 유효성 검사
+    if not validate_market_match(code, final_market):
+        return {"error": f"종목 코드 '{code}'와 시장 '{final_market}'이(가) 일치하지 않습니다."}
+
+    return get_stock_chart(code, period, final_market)
 
 @router.post("/chart/direct")
 def get_chart_direct(req: ChartDirectRequest):
     if not req.stock_code or not req.period:
         return {"error": "필수값 누락"}
-    return get_stock_chart(req.stock_code, req.period)
+
+    # 유효성 검사
+    if not validate_market_match(req.stock_code, req.market):
+        return {"error": f"종목 코드 '{req.stock_code}'와 시장 '{req.market}'이(가) 일치하지 않습니다."}
+
+    return get_stock_chart(req.stock_code, req.period, req.market)
+

@@ -86,9 +86,17 @@ def get_price(code: str, intent: str) -> dict:
     else:
         return {"error": f"지원하지 않는 intent: {intent}"}
     
-    
-def get_stock_chart(stock_code: str, period: str):
-    cache_key = f"chart:{stock_code}:{period}"
+def get_usd_to_krw_rate():
+    try:
+        res = requests.get("https://finance.naver.com/marketindex/exchangeDetail.naver?marketindexCd=FX_USDKRW")
+        res.encoding = "utf-8"
+        rate_text = res.text.split("blind\">")[1].split("</span>")[0].replace(",", "")
+        return float(rate_text)
+    except:
+        return 1350.0
+        
+def get_stock_chart(stock_code: str, period: str, market: str = None):
+    cache_key = f"chart:{stock_code}:{period}:{market}"
     
     session = requests.Session(impersonate="chrome")
 
@@ -118,8 +126,26 @@ def get_stock_chart(stock_code: str, period: str):
     df["fluctuation_rate"] = df["fluctuation_rate"].round(2)
     df = df.dropna()
 
-    result = df.to_dict(orient="records")
+    usd_to_krw = get_usd_to_krw_rate() if market == "US" else None
+
+    result = []
+    for row in df.to_dict(orient="records"):
+        item = dict(row)
+
+        if market == "US":
+            # 해외 종목은 소수점 2자리로 반올림
+            item["open"] = round(item["open"], 2)
+            item["high"] = round(item["high"], 2)
+            item["low"] = round(item["low"], 2)
+            item["close"] = round(item["close"], 2)
+
+            usd_to_krw = get_usd_to_krw_rate()
+            item["open_krw"] = int(item["open"] * usd_to_krw)
+            item["high_krw"] = int(item["high"] * usd_to_krw)
+            item["low_krw"] = int(item["low"] * usd_to_krw)
+            item["close_krw"] = int(item["close"] * usd_to_krw)
+
+        result.append(item)
 
     r.setex(cache_key, 3600, json.dumps(result))
-
     return result
