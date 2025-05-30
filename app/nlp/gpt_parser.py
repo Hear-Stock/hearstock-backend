@@ -7,58 +7,44 @@ load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
 
 client = OpenAI(api_key=api_key)
-def extract_stock_info(text: str):
+
+def extract_intent(text: str):
     prompt = """
-    입력 문장에서 한국 주식 종목명과 조회 기간을 추출해서 아래 형식의 JSON으로 변환하세요:
-    {
-    "name": "삼성전자",
-    "period": "3mo",
-    "stock_code": "005930.KS"
-    }
+    너는 사용자의 자연어 주식 요청 문장을 분석해 아래 intent 중 하나를 분류하는 분류기야.
 
-    반드시 종목코드는 야후 파이낸스에 맞게 한국 종목은 .KS 또는 .KQ가 붙도록 하세요.
-    JSON 외에는 아무 설명도 출력하지 마세요.
-    """
+    아래 intent 중 하나로 분류해서, 종목명(name), 종목 코드(code), 시장(market), 의도(intent)를 JSON으로 반환하세요:
 
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": text}
-        ]
-    )
+    - intent 종류:
+    - chart: "차트", "캔들", "흐름", "그래프" 등 주가 흐름 요청
+    - current_price: 현재가 요청 ("얼마", "시세", "현재가" 등)
+    - high_limit: 상한가 요청
+    - low_limit: 하한가 요청
+    - indicator: 투자지표 요청 (PER, PBR, ROE 등)
 
-    result = response.choices[0].message.content.strip()
-
-    try:
-        return json.loads(result)
-    except json.JSONDecodeError:
-        return None
-    
-def extract_price_info(text: str):
-    prompt = """
-    다음 문장에서 주식 종목명과 사용자의 의도, 시장을 JSON 형식으로 반환하세요.
-
-    - intent는 다음 중 하나: current_price, high_limit, low_limit, indicator
-    - code는 종목 코드 (예: 삼성전자 → 005930, 테슬라 → TSLA)
-    - market은 "KR" (한국) 또는 "US" (미국)
+    기준:
+    - "차트", "흐름", "캔들" → chart
+    - "현재가", "얼마", "시세" → current_price
+    - "PER", "PBR", "ROE", "투자지표" → indicator
+    - "상한가", "하한가" 명시 → 해당 intent
 
     예시:
-    "삼성전자 상한가 알려줘" → {
-    "name": "삼성전자",
-    "code": "005930",
-    "intent": "high_limit",
-    "market": "KR"
+    "삼성전자 차트 알려줘" →
+    {
+        "name": "삼성전자",
+        "code": "005930",
+        "intent": "chart",
+        "market": "KR"
     }
 
-    "애플 투자지표 알려줘" → {
-    "name": "애플",
-    "code": "AAPL",
-    "intent": "indicator",
-    "market": "US"
+    "테슬라 PER 알려줘" →
+    {
+        "name": "테슬라",
+        "code": "TSLA",
+        "intent": "indicator",
+        "market": "US"
     }
 
-    JSON 외에 아무 설명도 출력하지 마세요.
+    반드시 JSON만 출력하고, 설명은 생략하세요.
     """
 
     response = client.chat.completions.create(

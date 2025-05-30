@@ -1,4 +1,5 @@
 import requests
+from curl_cffi import requests
 import redis
 import json
 from bs4 import BeautifulSoup
@@ -12,13 +13,12 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_DB = int(os.getenv("REDIS_DB", 0))
 
 r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
-print("Redis host:", REDIS_HOST)  # localhost가 출력돼야 함
-
 
 # 해외 현재가 조회
 def get_overseas_price(symbol: str):
-    import yfinance as yf
-    ticker = yf.Ticker(symbol)
+    session = requests.Session(impersonate="chrome")
+
+    ticker = yf.Ticker(symbol, session=session)
     data = ticker.history(period="1d", interval="1m")
 
     if data.empty:
@@ -86,13 +86,22 @@ def get_price(code: str, intent: str) -> dict:
     else:
         return {"error": f"지원하지 않는 intent: {intent}"}
     
-def get_stock_chart(stock_code: str, period: str):
-    cache_key = f"chart:{stock_code}:{period}"
+def get_usd_to_krw_rate():
+    try:
+        res = requests.get("https://finance.naver.com/marketindex/exchangeDetail.naver?marketindexCd=FX_USDKRW")
+        res.encoding = "utf-8"
+        rate_text = res.text.split("blind\">")[1].split("</span>")[0].replace(",", "")
+        return float(rate_text)
+    except:
+        return 1350.0
+        
+def get_stock_chart(stock_code: str, period: str, market: str = None):
+    cache_key = f"chart:{stock_code}:{period}:{market}"
     
-    cached_data = r.get(cache_key)
+    session = requests.Session(impersonate="chrome")
 
     try:
-        ticker = yf.Ticker(stock_code)
+        ticker = yf.Ticker(stock_code, session=session)
         _ = ticker.info
         df = ticker.history(period=period, interval="1d")
     except Exception as e:
@@ -117,13 +126,26 @@ def get_stock_chart(stock_code: str, period: str):
     df["fluctuation_rate"] = df["fluctuation_rate"].round(2)
     df = df.dropna()
 
-    result = df.to_dict(orient="records")
+    usd_to_krw = get_usd_to_krw_rate() if market == "US" else None
+
+    result = []
+    for row in df.to_dict(orient="records"):
+        item = dict(row)
+
+        if market == "US":
+            # 해외 종목은 소수점 2자리로 반올림
+            item["open"] = round(item["open"], 2)
+            item["high"] = round(item["high"], 2)
+            item["low"] = round(item["low"], 2)
+            item["close"] = round(item["close"], 2)
+
+            usd_to_krw = get_usd_to_krw_rate()
+            item["open_krw"] = int(item["open"] * usd_to_krw)
+            item["high_krw"] = int(item["high"] * usd_to_krw)
+            item["low_krw"] = int(item["low"] * usd_to_krw)
+            item["close_krw"] = int(item["close"] * usd_to_krw)
+
+        result.append(item)
 
     r.setex(cache_key, 3600, json.dumps(result))
-
     return result
-
-
-if __name__ == '__main__':
-    print(get_stock_chart("005930.KS", "max"))
-    # print(get_overseas_price("AAPL"))

@@ -1,84 +1,61 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from app.nlp.gpt_parser import extract_stock_info, extract_price_info
 from app.services.stock_service import get_stock_chart, get_price, get_overseas_price
 
 router = APIRouter(prefix="/api/stock", tags=["Stock"])
 
-class TextRequest(BaseModel):
-    text: str
-
 class ChartDirectRequest(BaseModel):
     stock_code: str
     period: str
-    name: str
+    market: str = "KR"
 
-@router.post("/price")
-def get_price_info(req: TextRequest):
-    parsed = extract_price_info(req.text)
-    if not parsed:
-        return {"error": "GPT 파싱 실패"}
+def infer_market(code: str) -> str:
+    return "KR" if code.endswith(".KS") or code.endswith(".KQ") else "US"
 
-    code = parsed.get("code")
-    intent = parsed.get("intent")
-    market = parsed.get("market", "KR") 
+def validate_market_match(code: str, market: str) -> bool:
+    if market == "KR" and not (code.endswith(".KS") or code.endswith(".KQ")):
+        return False
+    if market == "US" and (code.endswith(".KS") or code.endswith(".KQ")):
+        return False
+    return True
 
+@router.get("/price")
+def get_price_info(
+    code: str = Query(..., description="종목 코드 (예: 005930, TSLA 등)"),
+    intent: str = Query(..., description="의도 (예: current_price, high_limit, low_limit 등)"),
+    market: str = Query("KR", description="시장 구분 (KR | US)")
+):
     if market == "KR":
-        code = code.split(".")[0]  
+        code = code.split(".")[0]
         return get_price(code, intent)
-
     elif market == "US":
         if intent == "current_price":
             return get_overseas_price(code)
-        else:
-            return {"error": "해외 종목은 현재가만 지원합니다."}
+        return {"error": "해외 종목은 현재가만 지원합니다."}
+    return {"error": f"Unsupported market type: {market}"}
 
-    else:
-        return {"error": f"Unsupported market type: {market}"}
+@router.get("/chart")
+def get_chart_by_query(
+    code: str = Query(..., description="야후 파이낸스 형식의 종목 코드 (예: 005930.KS, TSLA)"),
+    period: str = Query(..., description="차트 기간 (예: 3mo, 1y 등)"),
+    market: str = Query(None, description="시장 구분 (KR | US), 생략 시 자동 추론")
+):
+    final_market = market or infer_market(code)
 
-@router.post("/chart")
-def get_chart(req: TextRequest):
-    parsed = extract_stock_info(req.text)
+    # 유효성 검사
+    if not validate_market_match(code, final_market):
+        return {"error": f"종목 코드 '{code}'와 시장 '{final_market}'이(가) 일치하지 않습니다."}
 
-    if not parsed or "stock_code" not in parsed:
-        return {"error": "GPT 파싱 실패"}
+    return get_stock_chart(code, period, final_market)
 
-    stock_code = parsed["stock_code"]
-    period = parsed["period"]
-    name = parsed["name"]
-
-    data = get_stock_chart(stock_code, period)
-
-    return {
-        "meta": {
-            "name": name,
-            "code": stock_code,
-            "market": "US" if ".KS" not in stock_code and ".KQ" not in stock_code else "KR",
-            "intent": "chart",
-            "period": period
-        },
-        "data": data
-    }
-
-# 음성이 아닌 버튼으로 차트를 조회할때
 @router.post("/chart/direct")
 def get_chart_direct(req: ChartDirectRequest):
-    stock_code = req.stock_code
-    period = req.period
-    name = req.name
-
-    if not stock_code or not period:
+    if not req.stock_code or not req.period:
         return {"error": "필수값 누락"}
 
-    data = get_stock_chart(stock_code, period)
+    # 유효성 검사
+    if not validate_market_match(req.stock_code, req.market):
+        return {"error": f"종목 코드 '{req.stock_code}'와 시장 '{req.market}'이(가) 일치하지 않습니다."}
 
-    return {
-        "meta": {
-            "name": name,
-            "code": stock_code,
-            "market": "US" if ".KS" not in stock_code and ".KQ" not in stock_code else "KR",
-            "intent": "chart",
-            "period": period
-        },
-        "data": data
-    }
+    return get_stock_chart(req.stock_code, req.period, req.market)
+
