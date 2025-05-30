@@ -1,30 +1,44 @@
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, Query
 from app.services.indicator_service import get_investment_metrics
-from app.nlp.gpt_parser import extract_price_info
-
-class TextRequest(BaseModel):
-    text: str
 
 router = APIRouter(prefix="/api/indicator", tags=["Indicator"])
 
-@router.post("/")
-def get_investment_info(req: TextRequest):
-    parsed = extract_price_info(req.text)
-    if not parsed:
-        return {"error": "GPT 파싱 실패"}
-
-    code = parsed.get("code")
-    market = parsed.get("market", "KR")
-
-    if not code:
-        return {"error": "종목 코드 없음"}
-
+# 투자지표 조회 (쿼리 기반)
+@router.get("/")
+def get_investment_info(
+    code: str = Query(..., description="종목 코드 (예: 005930, TSLA 등)"),
+    market: str = Query("KR", description="시장 구분 (KR | US)")
+):
     data = get_investment_metrics(code, market)
     if "error" in data:
         return {"error": data["error"]}
+    return data
+
+# 특정 지표 설명 조회 (쿼리 기반)
+@router.get("/explain")
+def explain_metric(
+    code: str = Query(..., description="종목 코드"),
+    market: str = Query("KR", description="시장"),
+    metric: str = Query(..., description="지표명 (예: PER, PBR, ROE 등)")
+):
+    data = get_investment_metrics(code, market)
+
+    if "error" in data:
+        return {"text": f"해당 종목의 투자지표를 불러올 수 없습니다. ({data['error']})"}
+
+    value = data.get(metric)
+    summary = data.get("summary", "")
+
+    if value is None:
+        return {"text": f"{metric} 지표는 제공되지 않습니다."}
+
+    # 요약에서 해당 metric 관련 문장 추출
+    if summary:
+        for sentence in summary.split("."):
+            sentence = sentence.strip()
+            if metric in sentence:
+                return {"text": f"{metric}은 {value}이며, {sentence}."}
 
     return {
-        "meta": parsed, 
-        "data": data    
+        "text": f"{metric} 값은 {value}입니다. 현재 산업 평균과의 비교 정보는 제공되지 않습니다."
     }
