@@ -119,49 +119,60 @@ def get_stock_chart(stock_code: str, period: str, market: str = None):
         result = df.to_dict(orient="records")
 
     elif market == "US":
-        session = requests.Session(impersonate="chrome")
-
         try:
+            period_map = {
+                "3mo": "1d",
+                "1y": "1wk",
+                "5y": "1mo",
+                "all": "1mo"
+            }
+
+            if period not in period_map:
+                return {"error": f"지원하지 않는 기간: {period}"}
+
+            interval = period_map[period]
+
+            session = requests.Session(impersonate="chrome")
             ticker = yf.Ticker(stock_code, session=session)
-            _ = ticker.info
-            df = ticker.history(period=period, interval="1d")
+            df = ticker.history(period=period if period != "all" else "max", interval=interval)
+
+            if df.empty:
+                return {"error": "No chart data available."}
+
+            df = df.reset_index()
+            df["timestamp"] = df["Date"].dt.strftime("%Y-%m-%d")
+            df = df[["timestamp", "Open", "High", "Low", "Close", "Volume"]]
+
+            df.rename(columns={
+                "Open": "open",
+                "High": "high",
+                "Low": "low",
+                "Close": "close",
+                "Volume": "volume"
+            }, inplace=True)
+
+            df["fluctuation_rate"] = df["close"].pct_change() * 100
+            df["fluctuation_rate"] = df["fluctuation_rate"].round(2)
+            df = df.dropna()
+
+            usd_to_krw = get_usd_to_krw_rate()
+
+            for row in df.to_dict(orient="records"):
+                item = dict(row)
+                item["open"] = round(item["open"], 2)
+                item["high"] = round(item["high"], 2)
+                item["low"] = round(item["low"], 2)
+                item["close"] = round(item["close"], 2)
+
+                item["open_krw"] = int(item["open"] * usd_to_krw)
+                item["high_krw"] = int(item["high"] * usd_to_krw)
+                item["low_krw"] = int(item["low"] * usd_to_krw)
+                item["close_krw"] = int(item["close"] * usd_to_krw)
+
+                result.append(item)
+
         except Exception as e:
             return {"error": f"yfinance error: {e}"}
-
-        if df.empty:
-            return {"error": "No chart data available."}
-
-        df = df.reset_index()
-        df["date"] = df["Date"].dt.strftime("%Y-%m-%d")
-        df = df[["date", "Open", "High", "Low", "Close", "Volume"]]
-
-        df.rename(columns={
-            "Open": "open",
-            "High": "high",
-            "Low": "low",
-            "Close": "close",
-            "Volume": "volume"
-        }, inplace=True)
-
-        df["fluctuation_rate"] = df["close"].pct_change() * 100
-        df["fluctuation_rate"] = df["fluctuation_rate"].round(2)
-        df = df.dropna()
-
-        usd_to_krw = get_usd_to_krw_rate()
-
-        for row in df.to_dict(orient="records"):
-            item = dict(row)
-            item["open"] = round(item["open"], 2)
-            item["high"] = round(item["high"], 2)
-            item["low"] = round(item["low"], 2)
-            item["close"] = round(item["close"], 2)
-
-            item["open_krw"] = int(item["open"] * usd_to_krw)
-            item["high_krw"] = int(item["high"] * usd_to_krw)
-            item["low_krw"] = int(item["low"] * usd_to_krw)
-            item["close_krw"] = int(item["close"] * usd_to_krw)
-
-            result.append(item)
 
     else:
         return {"error": f"지원하지 않는 market: {market}"}
