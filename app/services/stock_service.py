@@ -6,6 +6,9 @@ from bs4 import BeautifulSoup
 import yfinance as yf
 import os
 from dotenv import load_dotenv
+import pandas as pd
+from datetime import datetime, timedelta
+from .kiwoom_service import fetch_chart_data
 
 load_dotenv()
 REDIS_HOST = os.getenv("REDIS_HOST")
@@ -23,7 +26,7 @@ def get_overseas_price(symbol: str):
 
     if data.empty:
         return {"error": f"No data for {symbol}"}
-    # print(data)
+
     return {
         "code": symbol,
         "current_price": round(data["Close"].iloc[-1], 2)
@@ -85,7 +88,8 @@ def get_price(code: str, intent: str) -> dict:
         return {"name": name, "low_limit": summary.get("low_limit")}
     else:
         return {"error": f"지원하지 않는 intent: {intent}"}
-    
+
+# 환율 변환 함수   
 def get_usd_to_krw_rate():
     try:
         res = requests.get("https://finance.naver.com/marketindex/exchangeDetail.naver?marketindexCd=FX_USDKRW")
@@ -97,55 +101,70 @@ def get_usd_to_krw_rate():
         
 def get_stock_chart(stock_code: str, period: str, market: str = None):
     cache_key = f"chart:{stock_code}:{period}:{market}"
-    
-    session = requests.Session(impersonate="chrome")
-
-    try:
-        ticker = yf.Ticker(stock_code, session=session)
-        _ = ticker.info
-        df = ticker.history(period=period, interval="1d")
-    except Exception as e:
-        return {"error": f"yfinance error: {e}"}
-
-    if df.empty:
-        return {"error": "No chart data available."}
-
-    df = df.reset_index()
-    df["date"] = df["Date"].dt.strftime("%Y-%m-%d")
-    df = df[["date", "Open", "High", "Low", "Close", "Volume"]]
-
-    df.rename(columns={
-        "Open": "open",
-        "High": "high",
-        "Low": "low",
-        "Close": "close",
-        "Volume": "volume"
-    }, inplace=True)
-
-    df["fluctuation_rate"] = df["close"].pct_change() * 100
-    df["fluctuation_rate"] = df["fluctuation_rate"].round(2)
-    df = df.dropna()
-
-    usd_to_krw = get_usd_to_krw_rate() if market == "US" else None
+    r.delete(cache_key) # 나중에 꼭 지우기
 
     result = []
-    for row in df.to_dict(orient="records"):
-        item = dict(row)
 
-        if market == "US":
-            # 해외 종목은 소수점 2자리로 반올림
+    if market == "KR":
+        code = stock_code.split(".")[0]
+
+        df = fetch_chart_data(code=code, period=period)
+
+        if isinstance(df, dict) and "error" in df:
+            return df
+
+        df = pd.DataFrame(df)  
+        df = df.replace([float('inf'), float('-inf')], pd.NA).fillna(0) # 결측치 처리
+
+        result = df.to_dict(orient="records")
+
+    elif market == "US":
+        session = requests.Session(impersonate="chrome")
+
+        try:
+            ticker = yf.Ticker(stock_code, session=session)
+            _ = ticker.info
+            df = ticker.history(period=period, interval="1d")
+        except Exception as e:
+            return {"error": f"yfinance error: {e}"}
+
+        if df.empty:
+            return {"error": "No chart data available."}
+
+        df = df.reset_index()
+        df["date"] = df["Date"].dt.strftime("%Y-%m-%d")
+        df = df[["date", "Open", "High", "Low", "Close", "Volume"]]
+
+        df.rename(columns={
+            "Open": "open",
+            "High": "high",
+            "Low": "low",
+            "Close": "close",
+            "Volume": "volume"
+        }, inplace=True)
+
+        df["fluctuation_rate"] = df["close"].pct_change() * 100
+        df["fluctuation_rate"] = df["fluctuation_rate"].round(2)
+        df = df.dropna()
+
+        usd_to_krw = get_usd_to_krw_rate()
+
+        for row in df.to_dict(orient="records"):
+            item = dict(row)
             item["open"] = round(item["open"], 2)
             item["high"] = round(item["high"], 2)
             item["low"] = round(item["low"], 2)
             item["close"] = round(item["close"], 2)
 
-            usd_to_krw = get_usd_to_krw_rate()
             item["open_krw"] = int(item["open"] * usd_to_krw)
             item["high_krw"] = int(item["high"] * usd_to_krw)
             item["low_krw"] = int(item["low"] * usd_to_krw)
             item["close_krw"] = int(item["close"] * usd_to_krw)
 
-        result.append(item)
+            result.append(item)
+
+    else:
+        return {"error": f"지원하지 않는 market: {market}"}
 
     r.setex(cache_key, 3600, json.dumps(result))
     return result

@@ -20,12 +20,14 @@ def extract_intent(text: str):
     - high_limit: 상한가 요청
     - low_limit: 하한가 요청
     - indicator: 투자지표 요청 (PER, PBR, ROE 등)
+    - realtime_chart: 실시간 종목 정보 (예: "실시간", "주식 정보 알려줘", "지표 다 보여줘")
 
     기준:
     - "차트", "흐름", "캔들" → chart
     - "현재가", "얼마", "시세" → current_price
     - "PER", "PBR", "ROE", "투자지표" → indicator
     - "상한가", "하한가" 명시 → 해당 intent
+    - "실시간", "전체 정보", "종목 정보", "주식 정보 알려줘" 등 → realtime_chart
 
     예시:
     "삼성전자 차트 알려줘" →
@@ -111,8 +113,6 @@ def extract_price_info(text: str):
 
 def stock_info_parser(text: str):
     prompt = """
-    
-
     다음 문장에서 주식 종목명과 사용자의 의도, 시장을 JSON 형식으로 반환하세요.
     intent를 찾을 수 없다면 intent : "" 으로 설정
     - intent는 다음 중 하나: stock_info = {

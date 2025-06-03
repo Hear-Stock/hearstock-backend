@@ -27,7 +27,7 @@ def parse_intent(req: TextRequest):
             "market": market,
             "intent": "chart",
             "period": period,
-            "path": f"/api/stock/chart?code={code}&period={period}"
+            "path": f"/api/stock/chart?code={code}&period={period}&market={market}"
         }
 
     elif intent == "indicator":
@@ -36,7 +36,7 @@ def parse_intent(req: TextRequest):
             "code": code,
             "market": market,
             "intent": "indicator",
-            "path": "/api/indicator"
+            "path": "/api/indicator?code={code}&market={market}"
         }
 
     elif intent in ["current_price", "high_limit", "low_limit"]:
@@ -45,7 +45,16 @@ def parse_intent(req: TextRequest):
             "code": code,
             "market": market,
             "intent": intent,
-            "path": "/api/stock/price"
+            "path": "/api/stock/price?code={code}&intent={intent}&market={market}"
+        }
+    
+    elif intent == "realtime_chart":  
+        return {
+            "name": name,
+            "code": code,
+            "market": market,
+            "intent": "realtime_chart",
+            "path": f"/api/stock/stkinfo?code={code}&market={market}"
         }
 
     return {"error": f"지원하지 않는 intent입니다: {intent}"}
