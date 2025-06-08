@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api import stock, indicator, intent
+from app.api import stock, stock_cur, indicator, intent
 
 app = FastAPI()
 
@@ -7,3 +7,4 @@ app = FastAPI()
 app.include_router(stock.router)
 app.include_router(intent.router)
 app.include_router(indicator.router)
+app.include_router(stock_cur.router)
