@@ -58,7 +58,25 @@ def get_stock_metrics(
 	stock_data["industry_per"] = industry_data.get("per")
 	stock_data["industry_change_rate"] = industry_data.get("change_rate")
 
-	return stock_data
+	# 필요한 투자지표만 추출
+	filtered_data = {
+		"mac": stock_data.get("mac"),  # 시가총액
+		"upl_pric": stock_data.get("upl_pric"),  # 상한가
+		"lst_pric": stock_data.get("lst_pric"),	# 하한가
+		"sale_amt": stock_data.get("sale_amt"),	# 매출액
+		"bus_pro": stock_data.get("bus_pro"), # 영업이익
+		"cup_nga": stock_data.get("cup_nga"), # 당기순이익
+		"per": stock_data.get("per"),
+		"eps": stock_data.get("eps"),
+		"roe": stock_data.get("roe"),
+		"pbr": stock_data.get("pbr"),
+		"ev": stock_data.get("ev"),
+		"bps": stock_data.get("bps"),
+		"industry_per": stock_data.get("industry_per"),
+		"industry_change_rate": stock_data.get("industry_change_rate")
+	}
+
+	return filtered_data
 
 
 @router.get("/findstk")
