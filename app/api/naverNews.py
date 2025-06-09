@@ -1,13 +1,19 @@
-import os
 
-import requests
-from dotenv import load_dotenv
 """
 네이버 검색 api로 검색어의 검색 결과 불러오기
 """
+import os
+import requests
+from dotenv import load_dotenv
+from fastapi import APIRouter, Query
+from pydantic import BaseModel
+
+
+
+router = APIRouter(prefix="/api/news", tags=["News"])
 
 load_dotenv()
-def searchNews(query="삼성전자"
+def searchNews(query
                ,display = 10
                , start = 1
                , sort = 'sim',
@@ -44,24 +50,31 @@ def searchNews(query="삼성전자"
     if response.status_code == 200:
         json = response.json()
         items = json['items']
-        # 제목, 링크, 내용, 날짜 출력력
+        result = []
+        # 제목, 링크, 내용, 날짜 출력
         for item in items:
             title = item['title'].replace('<b>', '').replace('</b>', '')  # HTML 태그 제거
             link = item['link']
             description = item['description'].replace('<b>', '').replace('</b>', '')
             pubDate = item['pubDate']
 
-            print(f"Title: {title}")
-            print(f"Link: {link}")
-            print(f"Description: {description}")
-            print(f"Published Date: {pubDate}")
-            print()
+            result.append({
+            'title': title,
+            'link': link,
+            'description': description,
+            'pubDate': pubDate
+        })
+
+        return result
     else:
-        print("Error:", response.text)
+        return {"Error:", response.text}
+    
 
-
-if __name__ == "__main__":
-    searchNews()
-
-
-
+@router.get("/searchNews")
+def get_news(
+		query: str = Query(..., description="검색어 입력")
+		, display: str = Query("10", description="검색 개수")
+        , start: str = Query("1", description="검색 시작위치")
+        , sort: str = Query("sim", description="sim: 정확도순으로 내림차순 정렬(기본값) date: 날짜순으로 내림차순 정렬") ):
+	
+	return  searchNews(query=query)
