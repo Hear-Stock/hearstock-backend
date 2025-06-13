@@ -27,17 +27,15 @@ def explain_metric(
         return {"text": f"해당 종목의 투자지표를 불러올 수 없습니다. ({data['error']})"}
 
     value = data.get(metric)
-    summary = data.get("summary", "")
+    industry_per = data.get("industry_per")
+    industry_rate = data.get("industry_rate")
 
     if value is None:
         return {"text": f"{metric} 지표는 제공되지 않습니다."}
 
     # 요약에서 해당 metric 관련 문장 추출
-    if summary:
-        for sentence in summary.split("."):
-            sentence = sentence.strip()
-            if metric in sentence:
-                return {"text": f"{metric}은 {value}이며, {sentence}."}
+    if industry_per:
+        return {"text": f"{metric}은 {value}이며, 현재 산업 평균 PER은 {industry_per}, 등락률은 {industry_rate} 입니다."}
 
     return {
         "text": f"{metric} 값은 {value}입니다. 현재 산업 평균과의 비교 정보는 제공되지 않습니다."
