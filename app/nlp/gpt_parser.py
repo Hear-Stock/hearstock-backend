@@ -10,7 +10,7 @@ client = OpenAI(api_key=api_key)
 
 def extract_intent(text: str):
     prompt = """
-    너는 사용자의 자연어 주식 요청 문장을 분석해 아래 intent 중 하나를 분류하는 분류기야.
+    너는 사용자의 자연어 주식 요청 문장을 분석해 아래 intent 중 하나를 분류하는 JSON 분석기야.
 
     아래 intent 중 하나로 분류해서, 종목명(name), 종목 코드(code), 시장(market), 의도(intent)를 JSON으로 반환하세요:
 
@@ -20,33 +20,41 @@ def extract_intent(text: str):
     - high_limit: 상한가 요청
     - low_limit: 하한가 요청
     - indicator: 투자지표 요청 (PER, PBR, ROE 등)
-    - realtime_chart: 실시간 종목 정보 (예: "실시간", "주식 정보 알려줘", "지표 다 보여줘")
+    - realtime_chart: 실시간 종목 정보 ("실시간", "전체 정보", "주식 정보 알려줘")
 
-    기준:
-    - "차트", "흐름", "캔들" → chart
-    - "현재가", "얼마", "시세" → current_price
-    - "PER", "PBR", "ROE", "투자지표" → indicator
-    - "상한가", "하한가" 명시 → 해당 intent
-    - "실시간", "전체 정보", "종목 정보", "주식 정보 알려줘" 등 → realtime_chart
+    - 종목 코드(code)는 반드시 시장 접미어 포함:
+    - 코스피 종목: `.KS` 붙이기 (예: 삼성전자 → `005930.KS`)
+    - 코스닥 종목: `.KQ` 붙이기 (예: 셀트리온헬스케어 → `091990.KQ`)
+    - 미국 종목: `.US`는 생략 가능 (예: 테슬라 → `TSLA`)
+
+    - 시장(market)은 "KR" 또는 "US"로 표기
 
     예시:
-    "삼성전자 차트 알려줘" →
+    "삼성전자 차트 보여줘" →
     {
-        "name": "삼성전자",
-        "code": "005930",
-        "intent": "chart",
-        "market": "KR"
+    "name": "삼성전자",
+    "code": "005930.KS",
+    "intent": "chart",
+    "market": "KR"
     }
 
-    "테슬라 PER 알려줘" →
+    "에코프로 현재가" →
     {
-        "name": "테슬라",
-        "code": "TSLA",
-        "intent": "indicator",
-        "market": "US"
+    "name": "에코프로",
+    "code": "086520.KQ",
+    "intent": "current_price",
+    "market": "KR"
     }
 
-    반드시 JSON만 출력하고, 설명은 생략하세요.
+    "애플 PER 알려줘" →
+    {
+    "name": "애플",
+    "code": "AAPL",
+    "intent": "indicator",
+    "market": "US"
+    }
+
+    JSON 외에 아무 설명도 출력하지 마세요.
     """
 
     response = client.chat.completions.create(
@@ -60,7 +68,7 @@ def extract_intent(text: str):
     result = response.choices[0].message.content.strip()
     try:
         parsed = json.loads(result)
-        if not all(k in parsed for k in ("name", "code", "intent")):
+        if not all(k in parsed for k in ("name", "code", "intent", "market")):
             return None
         return parsed
     except json.JSONDecodeError:

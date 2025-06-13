@@ -101,7 +101,13 @@ def get_usd_to_krw_rate():
         
 def get_stock_chart(stock_code: str, period: str, market: str = None):
     cache_key = f"chart:{stock_code}:{period}:{market}"
-    r.delete(cache_key) # 나중에 꼭 지우기
+
+    cached = r.get(cache_key)
+    if cached:
+        try:
+            return json.loads(cached)
+        except json.JSONDecodeError:
+            pass  
 
     result = []
 
