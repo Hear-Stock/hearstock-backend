@@ -1,12 +1,18 @@
+import os
+import redis
+import json
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from app.api.kiwoomREST import get_kiwoom_token, get_kiwoom_stkinfo, get_kiwoom_chart, get_stock_code, get_stocks_by_keyword
-from app.services.industry_service import get_industry_per
+from app.services.industry_service import get_industry_info
 from app.nlp.gpt_parser import extract_price_info
 
 router = APIRouter(prefix="/api/stk", tags=["StockCurrent"])
 
-
+REDIS_HOST = os.getenv("REDIS_HOST")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+chart = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
+metric = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=2, decode_responses=True)
 
 # 주식 실시간 정보
 @router.get("/curPrice")
@@ -26,7 +32,6 @@ def get_stock_info(code: str = Query(..., description="종목 코드 (예: 00593
 		"거래량": stk_info["trde_qty"]
 	}
 
-
 	if (intent == None):
 		return cur_info
 	else:
@@ -39,11 +44,26 @@ def get_stock_info(code: str = Query(..., description="종목 코드 (예: 00593
 
 @router.get("/stkchart")
 def get_stock_chart(code: str = Query(..., description="종목 코드 (예: 005930, 000660 등)")):
-
+	cache_key = f"{code}"
+	chart_data = chart.get(cache_key)
+	if chart_data:
+		return json.loads(chart_data)
+	
 	data = get_kiwoom_chart(token=get_kiwoom_token(), code=code)
 	
 	result = data.to_dict(orient='records')
+	chart.setex(cache_key, 3600, json.dumps(result))
 
+	return result
+
+# 비교용
+@router.get("/chartNocache")
+def get_stock_chart_noCache(code: str = Query(..., description="종목 코드 (예: 005930, 000660 등)")):
+	
+	data = get_kiwoom_chart(token=get_kiwoom_token(), code=code)
+	
+	result = data.to_dict(orient='records')
+	
 	return result
 
 
@@ -51,12 +71,19 @@ def get_stock_chart(code: str = Query(..., description="종목 코드 (예: 0059
 def get_stock_metrics(
 		code: str = Query(..., description="종목 코드 (예: 005930, 000660 등)")
 		, ):
+	
+	# cache_key = f"metric:{code}"
+	# metric = chart.get(cache_key)
+	# if metric:
+	# 	return json.loads(metric)
+	
+
 	stock_data = get_kiwoom_stkinfo(token=get_kiwoom_token(), code=code)
-	industry_data = get_industry_per(code)
+	industry_data = get_industry_info(code)
 
 	# stock_data에 업종 데이터 병합
-	stock_data["industry_per"] = industry_data.get("per")
-	stock_data["industry_change_rate"] = industry_data.get("change_rate")
+	stock_data["industry_per"] = industry_data.get("industry_per")
+	stock_data["industry_change_rate"] = industry_data.get("industry_rate")
 
 	# 필요한 투자지표만 추출
 	filtered_data = {
@@ -75,6 +102,8 @@ def get_stock_metrics(
 		"industry_per": stock_data.get("industry_per"),
 		"industry_change_rate": stock_data.get("industry_change_rate")
 	}
+
+	# chart.setex(cache_key, 3600, json.dumps(filtered_data))
 
 	return filtered_data
 
