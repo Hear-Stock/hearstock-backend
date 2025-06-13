@@ -133,16 +133,66 @@ def crawl_investment_metrics(stock_code: str) -> dict:
         else:
             psr = "N/A"
 
+        # 시가총액 순위
+        try:
+            table = soup.find("table", summary="시가총액 정보")
+            tds = table.find_all("td") if table else []
+            market_rank = tds[1].get_text(strip=True) if len(tds) > 1 else None
+        except Exception:
+            market_rank = None
+
+        # 투자의견 및 목표주가
+        try:
+            table = soup.find("table", summary="투자의견 정보")
+            tds = table.find_all("td") if table else []
+            if len(tds) > 0:
+                opinion_span = tds[0].find("span", class_="f_up")
+                investment_opinion = opinion_span.get_text(strip=True) if opinion_span else None
+                em_tags = tds[0].find_all("em")
+                target_price = em_tags[-1].get_text(strip=True).replace(",", "") if em_tags else None
+            else:
+                investment_opinion = None
+                target_price = None
+        except Exception:
+            investment_opinion = None
+            target_price = None
+
+        # 동일 업종명
+        try:
+            a_tag = soup.find("div", class_="section trade_compare").find("a")
+            industry_name = a_tag.get_text(strip=True)
+        except Exception:
+            industry_name = None
+        
+
+        # 동일업종 PER, 등락률 정보
+        try:
+            table = soup.find("table", summary="동일업종 PER 정보")
+            tds = table.find_all("td") if table else []
+            industry_per = tds[0].get_text(strip=True) if len(tds) > 0 else None
+            industry_rate = tds[1].get_text(strip=True) if len(tds) > 1 else None
+        except Exception:
+            industry_per = None
+            industry_rate = None
+
         return {
             "corp_name": corp_name,
-            "market_cap": str(int(market_cap)), 
-            "dividend_yield": get_td_by_th_title(soup, "배당수익률"),
+            "market_cap": str(int(market_cap)),
+            "market_rank": market_rank,
+            "revenue": revenue,
+            "psr": psr,
             "per": get_td_by_th_title(soup, "PER"),
             "pbr": get_td_by_th_title(soup, "PBR"),
+            "dividend_yield": get_td_by_th_title(soup, "배당수익률"),
             "roe": get_roe(soup),
-            "psr": str(psr),
-            "foreign_ownership": get_foreign_ownership(soup)
+            "foreign_ownership": get_foreign_ownership(soup),
+            "inderstry_name" : industry_name,
+            "opinion": investment_opinion,
+            "target_price": target_price,
+            "industry_per": industry_per,
+            "industry_rate": industry_rate
         }
+
     except Exception as e:
         return {"error": str(e)}
 
@@ -170,3 +220,10 @@ def get_investment_metrics(code: str, market: str):
         return get_us_investment_metrics(code)  # yfinance API
     else:
         return {"error": f"Unsupported market: {market}"}
+    
+
+
+# 실행 예시
+if __name__ == "__main__":
+    result = crawl_investment_metrics("005930")  # 삼성전자
+    print(result)

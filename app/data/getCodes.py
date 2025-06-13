@@ -8,7 +8,7 @@ def getKospiCodes(filePath):
     # 정렬
     kospi = kospi.sort_values(by="상장시가총액(원)", ascending=False)
 
-    top100 = kospi.head(10)
+    top100 = kospi.head(3)
     codes = dict(zip(top100['종목코드'], top100['종목명']))
 
     return codes
@@ -25,8 +25,3 @@ def getKosdaqCodes(filePath):
     codes = dict(zip(top100['종목코드'], top100['종목명']))
 
     return codes
-
-
-if __name__ == "__main__":
-    dict = getKospiCodes("kosdaq150.csv")
-    print(dict)

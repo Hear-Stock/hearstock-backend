@@ -2,6 +2,7 @@ import os
 import requests
 import json
 import time
+import redis
 import pandas as pd
 from datetime import datetime
 from dotenv import load_dotenv
@@ -9,11 +10,23 @@ from dotenv import load_dotenv
 load_dotenv()
 API_KEY = os.getenv("KIWOOM_REST_KEY")
 SECRET_KEY = os.getenv("KIWOOM_REST_SECRET")
-MY_ACCESS_TOKEN = os.getenv("KIWOOM_REST_TOKEN")
+
+REDIS_HOST = os.getenv("REDIS_HOST")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+
+
+r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=9, decode_responses=True)
 
 
 # 접근토큰 발급
 def get_kiwoom_token():
+	cache_key = f"KIWOOM_TOKEN"
+	# Redis에서 토큰 조회
+	token = r.get(cache_key)
+
+	if token:
+		return token
+	
 	# 1. 요청할 API URL
 	host = 'https://mockapi.kiwoom.com'  # 모의투자
 	# host = 'https://api.kiwoom.com' # 실전투자
@@ -36,12 +49,13 @@ def get_kiwoom_token():
 	response = requests.post(url, headers=headers, json=params)
 
 	# 4. 응답 상태 코드와 데이터 출력
-	print('Code:', response.status_code)
+	# print('Code:', response.status_code)
 	# print('Header:', json.dumps({key: response.headers.get(key) for key in ['next-key', 'cont-yn', 'api-id']}, indent=4, ensure_ascii=False))
 	# print('Body:', json.dumps(response.json(), indent=4, ensure_ascii=False))  # JSON 응답을 파싱하여 출력
 
 	response = response.json()
-	print(response)
+	# 3. Redis에 저장 (유효 시간 동안만)
+	r.setex(cache_key, 3600, response['token'])
 	return response['token']
 
 
@@ -138,7 +152,7 @@ def fn_ka10081(token, cont_yn='N', next_key='', code="", date="20250501"):
 	next_key_val = response.headers.get('next-key')
 	# print(next_key_val)
 	# 4. 응답 상태 코드와 데이터 출력
-	# print('Code:', response.status_code)
+	print('Code:', response.status_code)
 	# print('Header:', json.dumps({key: response.headers.get(key) for key in ['next-key', 'cont-yn', 'api-id']}, indent=4, ensure_ascii=False))
 	# print('Body:', json.dumps(response.json(), indent=4, ensure_ascii=False))  # JSON 응답을 파싱하여 출력
 
@@ -187,6 +201,7 @@ def get_kiwoom_chart(token, code, date=datetime.now().strftime("%Y%m%d")):
 
 	# 날짜 포맷으로 변환
 	df_filtered['timestamp'] = pd.to_datetime(df_filtered['timestamp'], format='%Y%m%d')
+	df_filtered['timestamp'] = df_filtered['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S')
 
 	# 'open', 'close', 'high', 'low', 'volume' 컬럼을 숫자로 변환
 	df_filtered = df_filtered.where(pd.notnull(df_filtered), "0")
