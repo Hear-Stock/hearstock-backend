@@ -8,6 +8,13 @@ services:
       - "8000:8000"
     restart: always
 
+  redis:
+    image: redis:alpine
+    container_name: redis_server
+    ports:
+      - "6379:6379"
+    restart: always
+
   nginx:
     image: nginx:latest
     container_name: nginx_proxy
