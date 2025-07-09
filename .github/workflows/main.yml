@@ -35,7 +35,7 @@ jobs:
 
             echo "🛑 Stop and remove existing containers"
             docker-compose down || true
-            docker rm -f redis_server fastapi_app || true
+            docker rm -f redis_server fastapi_app nginx_proxy || true
 
             echo "🧼 Clean up dangling images"
             docker image prune -af || true
