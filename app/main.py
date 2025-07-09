@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api import stock, stock_cur, indicator, intent, naverNews
+from app.api import stock, stock_cur, indicator, intent, naverNews, test
 
 app = FastAPI()
 
@@ -9,3 +9,4 @@ app.include_router(intent.router)
 app.include_router(indicator.router)
 app.include_router(stock_cur.router)
 app.include_router(naverNews.router)
+app.include_router(test.router)
