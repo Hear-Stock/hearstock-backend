@@ -3,7 +3,7 @@ name: Deploy FastAPI with Docker to EC2
 on:
   push:
     branches:
-      - main 
+      - main
 
 jobs:
   deploy:
@@ -22,7 +22,7 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           source: "."
           target: "~/fastapi-app"
-          strip_components: 1  
+          strip_components: 1
 
       - name: SSH into EC2 and deploy
         uses: appleboy/ssh-action@v1.0.0
@@ -32,10 +32,15 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             cd ~/fastapi-app
-            echo "📦 Stop existing containers"
-            docker-compose down || true
 
-            echo "🛠 Build Docker containers"
+            echo "🛑 Stop and remove existing containers"
+            docker-compose down || true
+            docker rm -f redis_server fastapi_app || true
+
+            echo "🧼 Clean up dangling images"
+            docker image prune -af || true
+
+            echo "🔨 Build Docker images"
             docker-compose build --no-cache
 
             echo "🚀 Start containers"
