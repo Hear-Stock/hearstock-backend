@@ -10,3 +10,5 @@ psycopg2-binary
 pandas
 apscheduler
 yfinance==0.2.59
+redis>=5.0.0
+python-dotenv
