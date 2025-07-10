@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from app.services.stock_service import get_stock_chart, get_price, get_overseas_price
+from app.api.kiwoomREST import get_kiwoom_token,get_stock_code, get_stocks_by_keyword
 
 router = APIRouter(prefix="/api/stock", tags=["Stock"])
 
@@ -59,3 +60,20 @@ def get_chart_direct(req: ChartDirectRequest):
 
     return get_stock_chart(req.stock_code, req.period, req.market)
 
+
+@router.get("/findcode")
+def get_code(company_name: str = Query(..., description="기업 이름 입력 예) 삼성전자, SK하이닉스")
+			 ,market: str = Query(..., description="0:코스피, 10: 코스닥")):
+	
+	result = get_stock_code(token=get_kiwoom_token(), company_name=company_name, market=market)
+
+	return result
+
+@router.get("/findstk")
+def get_name_and_code(
+		keyword: str = Query(..., description="키워드 입력 예) 삼성, 현대")
+		,market: str = Query(..., description="0:코스피, 10: 코스닥") ):
+	
+	result = get_stocks_by_keyword(token=get_kiwoom_token(), keyword=keyword, market=market)
+
+	return result
