@@ -228,7 +228,7 @@ def fn_ka10094(token, cont_yn='N', next_key='', code="", date=datetime.today().s
 
 
 # 전업종지수요청
-def fn_ka20003(token, code, cont_yn='N', next_key=''):
+def get_industry_price(token, code, cont_yn='N', next_key=''):
 	# 1. 요청할 API URL
 	host = 'https://mockapi.kiwoom.com'  # 모의투자
 	# host = 'https://api.kiwoom.com' # 실전투자
@@ -251,13 +251,11 @@ def fn_ka20003(token, code, cont_yn='N', next_key=''):
 	}
 
 	# 3. http POST 요청
-	response = requests.post(url, headers=headers, json=params)
+	response = try_post(url, headers, params)
 
-	# 4. 응답 상태 코드와 데이터 출력
-	print('Code:', response.status_code)
-	print('Header:', json.dumps({key: response.headers.get(key) for key in ['next-key', 'cont-yn', 'api-id']}, indent=4,
-								ensure_ascii=False))
-	print('Body:', json.dumps(response.json(), indent=4, ensure_ascii=False))  # JSON 응답을 파싱하여 출력
+	if "error" in response:
+		return {"error": f"기본 정보 조회 실패: {response['error']}"}
+	return response
 
 
 # 테마그룹별요청
