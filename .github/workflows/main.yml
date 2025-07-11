@@ -1,0 +1,49 @@
+name: Deploy FastAPI with Docker to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to EC2 via SSH
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Copy project to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          source: "."
+          target: "~/fastapi-app"
+          strip_components: 1
+
+      - name: SSH into EC2 and deploy
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            cd ~/fastapi-app
+
+            echo "🛑 Stop and remove existing containers"
+            docker-compose down || true
+            docker rm -f redis_server fastapi_app nginx_proxy || true
+
+            echo "🧼 Clean up dangling images"
+            docker image prune -af || true
+
+            echo "🔨 Build Docker images"
+            docker-compose build --no-cache
+
+            echo "🚀 Start containers"
+            docker-compose up -d
+
+            echo "✅ Deployment completed!"
