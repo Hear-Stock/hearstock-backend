@@ -3,7 +3,7 @@ import redis
 import json
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from app.api.kiwoomREST import get_kiwoom_token, get_kiwoom_stkinfo, get_kiwoom_chart, get_stock_code, get_stocks_by_keyword
+from app.api.kiwoomREST import get_kiwoom_token, get_kiwoom_stkinfo, get_kiwoom_chart,get_kiwoom_stock_chart, get_stock_code, get_stocks_by_keyword
 from app.services.industry_service import get_industry_info
 from app.nlp.gpt_parser import extract_price_info
 
@@ -42,25 +42,11 @@ def get_stock_info(code: str = Query(..., description="종목 코드 (예: 00593
 	}
 
 
-@router.get("/stkchart")
-def get_stock_chart(code: str = Query(..., description="종목 코드 (예: 005930, 000660 등)")):
-	cache_key = f"{code}"
-	chart_data = chart.get(cache_key)
-	if chart_data:
-		return json.loads(chart_data)
-	
-	data = get_kiwoom_chart(token=get_kiwoom_token(), code=code)
-	
-	result = data.to_dict(orient='records')
-	chart.setex(cache_key, 3600, json.dumps(result))
-
-	return result
-
-# 비교용
-@router.get("/chartNocache")
+# 함수 하나로 합친
+@router.get("/kiwoomStockChart")
 def get_stock_chart_noCache(code: str = Query(..., description="종목 코드 (예: 005930, 000660 등)")):
 	
-	data = get_kiwoom_chart(token=get_kiwoom_token(), code=code)
+	data = get_kiwoom_stock_chart(token=get_kiwoom_token(), code=code)
 	
 	result = data.to_dict(orient='records')
 	
@@ -111,8 +97,8 @@ def get_stock_metrics(
 @router.get("/findstk")
 def get_name_and_code(
 		keyword: str = Query(..., description="키워드 입력 예) 삼성, 현대")
-		, ):
+		,market: str = Query(..., description="0:코스피, 10: 코스닥") ):
 	
-	result = get_stocks_by_keyword(token=get_kiwoom_token(), keyword=keyword)
+	result = get_stocks_by_keyword(token=get_kiwoom_token(), keyword=keyword, market=market)
 
 	return result

@@ -115,7 +115,7 @@ def crawl_investment_metrics(stock_code: str) -> dict:
     }
     url = f"https://finance.naver.com/item/main.nhn?code={stock_code}"
     res = requests.get(url, headers=headers)
-    res.encoding = "euc-kr"
+    res.encoding = "UTF-8"
     soup = BeautifulSoup(res.text, "html.parser")
 
     try:
@@ -186,7 +186,7 @@ def crawl_investment_metrics(stock_code: str) -> dict:
             "dividend_yield": get_td_by_th_title(soup, "배당수익률"),
             "roe": get_roe(soup),
             "foreign_ownership": get_foreign_ownership(soup),
-            "inderstry_name" : industry_name,
+            "industry_name" : industry_name,
             "opinion": investment_opinion,
             "target_price": target_price,
             "industry_per": industry_per,
@@ -221,6 +221,28 @@ def get_investment_metrics(code: str, market: str):
     else:
         return {"error": f"Unsupported market: {market}"}
     
+
+# --- 용어 사전 ---
+FINANCIAL_TERMS = {
+	"PER": "PER은 주가수익비율을 의미하며, 현재 주가를 주당 순이익으로 나눈 값으로 기업의 이익 대비 주가 수준을 나타냅니다. PER이 낮을수록 주가가 저평가되었다고 해석할 수 있습니다.",
+	"PBR": "PBR은 주가순자산비율을 의미하며, 현재 주가를 주당 순자산으로 나눈 값으로 기업의 자산 대비 주가 수준을 나타냅니다. PBR이 1보다 낮으면 주가가 저평가되었다고 해석할 수 있습니다.",
+	"ROE": "ROE는 자기자본이익률을 의미하며, 기업이 자기자본으로 얼마나 효율적으로 이익을 창출했는지를 나타내는 지표입니다. ROE가 높을수록 수익성이 좋다고 해석할 수 있습니다.",
+	"PSR": "PSR은 주가매출비율을 의미하며, 현재 주가를 주당 매출액으로 나눈 값으로 기업의 매출액 대비 주가 수준을 나타냅니다. PSR은 주로 성장하는 기업의 가치를 평가할 때 사용되며, 낮을수록 저평가되었다고 해석할 수 있습니다.",
+    "REVENUE": "매출액은 기업이 일정 기간 동안 상품 판매나 서비스 제공을 통해 벌어들인 총액을 의미합니다. 기업의 규모와 성장성을 파악하는 중요한 지표입니다.",
+    "DIVIDEND_YIELD": "배당수익률은 현재 주가 대비 연간 배당금의 비율을 나타냅니다. 투자자가 주식 보유를 통해 얻을 수 있는 현금 수익의 정도를 보여줍니다.",
+    "FOREIGN_OWNERSHIP": "외국인 소진율은 특정 종목의 발행 주식 총수 중 외국인 투자자가 보유하고 있는 주식의 비율을 나타냅니다. 외국인 투자자의 관심도와 시장의 신뢰도를 파악하는 데 활용될 수 있습니다."
+}
+
+
+# 금융 용어의 정의를 찾아 반환합니다
+def get_financial_definition(term: str) -> str:
+	term_upper = term.upper()
+	definition = FINANCIAL_TERMS.get(term_upper)
+	
+	if definition:
+		return definition
+	else:
+		return f"죄송합니다, 요청하신 용어 '{term}'에 대한 정보를 찾을 수 없습니다."
 
 
 # 실행 예시

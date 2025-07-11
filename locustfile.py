@@ -27,7 +27,7 @@ class StockApiUser(HttpUser):
         
         # GET 요청 보내기
         self.client.get(
-            "/api/stk/chartNocache",
+            "/api/stk/kiwoomStockChart",
             params={"code": code}
         )
 
