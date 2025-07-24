@@ -10,51 +10,48 @@ client = OpenAI(api_key=api_key)
 
 def extract_intent(text: str):
     prompt = """
-    너는 사용자의 자연어 주식 요청 문장을 분석해 아래 intent 중 하나를 분류하는 JSON 분석기야.
+    너는 사용자의 자연어 주식 요청 문장을 분석해 아래 JSON을 반환하는 분석기야.
 
-    아래 intent 중 하나로 분류해서, 종목명(name), 종목 코드(code), 시장(market), 의도(intent)를 JSON으로 반환하세요:
+    반환 JSON 형식:
+    {
+      "name": "종목명",
+      "code": "종목코드.시장",
+      "market": "KR" 또는 "US",
+      "intent": "chart | current_price | high_limit | low_limit | indicator | realtime_chart",
+      "period": "1d | 5d | 1mo | 3mo | 6mo | ytd | 1y | 5y | max" (chart일 때만 포함됨)
+    }
 
-    - intent 종류:
-    - chart: "차트", "캔들", "흐름", "그래프" 등 주가 흐름 요청
-    - current_price: 현재가 요청 ("얼마", "시세", "현재가" 등)
-    - high_limit: 상한가 요청
-    - low_limit: 하한가 요청
-    - indicator: 투자지표 요청 (PER, PBR, ROE 등)
-    - realtime_chart: 실시간 종목 정보 ("실시간", "전체 정보", "주식 정보 알려줘")
-
-    - 종목 코드(code)는 반드시 시장 접미어 포함:
-    - 코스피 종목: `.KS` 붙이기 (예: 삼성전자 → `005930.KS`)
-    - 코스닥 종목: `.KQ` 붙이기 (예: 셀트리온헬스케어 → `091990.KQ`)
-    - 미국 종목: `.US`는 생략 가능 (예: 테슬라 → `TSLA`)
-
-    - 시장(market)은 "KR" 또는 "US"로 표기
+    기간 표현 매핑:
+    - "하루", "오늘" → "1d"
+    - "일주일", "1주일", "7일" → "5d"
+    - "한 달", "1개월", "30일" → "1mo"
+    - "3개월", "3달" → "3mo"
+    - "6개월" → "6mo"
+    - "올해", "YTD" → "ytd"
+    - "1년", "1년치", "작년부터" → "1y"
+    - "5년", "5년치" → "5y"
+    - "전체", "처음부터", "모든 기간" → "max"
+    - 기간 언급이 없으면 기본값 "3mo"
 
     예시:
-    "삼성전자 차트 보여줘" →
+    "삼성전자 1년치 주식 차트 보여줘" →
     {
-    "name": "삼성전자",
-    "code": "005930.KS",
-    "intent": "chart",
-    "market": "KR"
+      "name": "삼성전자",
+      "code": "005930.KS",
+      "market": "KR",
+      "intent": "chart",
+      "period": "1y"
     }
 
-    "에코프로 현재가" →
+    "에코프로 현재가 알려줘" →
     {
-    "name": "에코프로",
-    "code": "086520.KQ",
-    "intent": "current_price",
-    "market": "KR"
+      "name": "에코프로",
+      "code": "086520.KQ",
+      "market": "KR",
+      "intent": "current_price"
     }
 
-    "애플 PER 알려줘" →
-    {
-    "name": "애플",
-    "code": "AAPL",
-    "intent": "indicator",
-    "market": "US"
-    }
-
-    JSON 외에 아무 설명도 출력하지 마세요.
+    JSON 외에 아무 설명도 하지 마세요.
     """
 
     response = client.chat.completions.create(
@@ -68,12 +65,19 @@ def extract_intent(text: str):
     result = response.choices[0].message.content.strip()
     try:
         parsed = json.loads(result)
-        if not all(k in parsed for k in ("name", "code", "intent", "market")):
+
+        # 기본 검증 + period는 선택적 (chart일 때만 있음)
+        required_keys = {"name", "code", "intent", "market"}
+        if not required_keys.issubset(parsed.keys()):
             return None
+
+        # chart인데 period가 없으면 기본값 적용
+        if parsed["intent"] == "chart":
+            parsed["period"] = parsed.get("period", "3mo")
+
         return parsed
     except json.JSONDecodeError:
         return None
-    
 
 def extract_price_info(text: str):
     prompt = """
@@ -96,97 +100,6 @@ def extract_price_info(text: str):
     "code": "AAPL",
     "intent": "indicator",
     "market": "US"
-    }
-
-    JSON 외에 아무 설명도 출력하지 마세요.
-    """
-
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": text}
-        ]
-    )
-
-    result = response.choices[0].message.content.strip()
-    try:
-        parsed = json.loads(result)
-        if not all(k in parsed for k in ("name", "code", "intent")):
-            return None
-        return parsed
-    except json.JSONDecodeError:
-        return None
-
-
-def stock_info_parser(text: str):
-    prompt = """
-    다음 문장에서 주식 종목명과 사용자의 의도, 시장을 JSON 형식으로 반환하세요.
-    intent를 찾을 수 없다면 intent : "" 으로 설정
-    - intent는 다음 중 하나: stock_info = {
-		"stk_cd": "종목코드",
-		"stk_nm": "종목명",
-		"setl_mm": "결산월",
-		"fav": "액면가",
-		"cap": "자본금",
-		"flo_stk": "상장주식",
-		"crd_rt": "신용비율",
-		"oyr_hgst": "연중최고",
-		"oyr_lwst": "연중최저",
-		"mac": "시가총액",
-		"mac_wght": "시가총액비중",
-		"for_exh_rt": "외인소진률",
-		"repl_pric": "대용가",
-		"per": "PER",
-		"eps": "EPS",
-		"roe": "ROE",
-		"pbr": "PBR",
-		"ev": "EV",
-		"bps": "BPS",
-		"sale_amt": "매출액",
-		"bus_pro": "영업이익",
-		"cup_nga": "당기순이익",
-		"250hgst": "250최고",
-		"250lwst": "250최저",
-		"high_pric": "고가",
-		"open_pric": "시가",
-		"low_pric": "저가",
-		"upl_pric": "상한가",
-		"lst_pric": "하한가",
-		"base_pric": "기준가",
-		"exp_cntr_pric": "예상체결가",
-		"exp_cntr_qty": "예상체결수량",
-		"250hgst_pric_dt": "250최고가일",
-		"250hgst_pric_pre_rt": "250최고가대비율",
-		"250lwst_pric_dt": "250최저가일",
-		"250lwst_pric_pre_rt": "250최저가대비율",
-		"cur_prc": "현재가",
-		"pre_sig": "대비기호",
-		"pred_pre": "전일대비",
-		"flu_rt": "등락율",
-		"trde_qty": "거래량",
-		"trde_pre": "거래대비",
-		"fav_unit": "액면가단위",
-		"dstr_stk": "유통주식",
-		"dstr_rt": "유통비율"
-	}
-    - code는 종목 코드 (예: 삼성전자 → 005930, sk하이닉스 → 000660)
-    - market은 코스피, 코스닥
-
-    예시:
-    "삼성전자 상한가 알려줘" → {
-    "name": "삼성전자",
-    "code": "005930",
-    "intent": "upl_pric",
-    "market": "코스피"
-    }
-
-    예시:
-    "sk하이닉스 주식 정보 알려줘" → {
-    "name": "SK하이닉스",
-    "code": "000660",
-    "intent": "",
-    "market": "코스피"
     }
 
     JSON 외에 아무 설명도 출력하지 마세요.
