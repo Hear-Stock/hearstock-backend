@@ -10,6 +10,12 @@ def get_exchange_rate(
 	contry: str = Query("", description="국가 입력 예) 미국, 일본")
 ):
 	data = get_exchange_rate_info()
+
+	# API 호출 결과가 에러인지 먼저 확인
+	if isinstance(data, dict) and "error" in data:
+		return data
+
+	# 성공 시, 국가 정보 검색
 	for i in data:
 		if contry in i["cur_nm"]:
 			return {
@@ -18,8 +24,9 @@ def get_exchange_rate(
                 "TTS": i["tts"],
                 "기준율": i["deal_bas_r"]
             }
-	if "error" in data:
-		return {"error": data["error"]}
+	
+	# 반복문이 끝날 때까지 국가를 찾지 못한 경우
+	return {"error": f"'{contry}'에 대한 환율 정보를 찾을 수 없습니다."}
 	
 @router.get("/indices")
 def get_kr_indece(

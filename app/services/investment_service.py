@@ -13,40 +13,41 @@ EXCHANGE_RATE_KEY = os.getenv("EXCHANGE_RATE_KEY")
 
 # 환율 정보 API 사용 (한국수출입은행)
 def _fetch_exchange_rate(date_str: str) -> dict:
-    url = "https://www.koreaexim.go.kr/site/program/financial/exchangeJSON"
-    
-    params = {
-        'authkey': EXCHANGE_RATE_KEY,
-        'searchdate': date_str,
-        'data': 'AP01',
-    }
-    
-    try:
-        response = requests.get(url, params=params)
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        return {"error": f"환율 정보 조회 중 오류가 발생했습니다: {e}"}
-    except (KeyError, TypeError):
-        return {"error": "환율 정보의 형식이 예상과 다릅니다."}
+	# url = "https://www.koreaexim.go.kr/site/program/financial/exchangeJSON"
+	url = "https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON"
+	
+	params = {
+		'authkey': EXCHANGE_RATE_KEY,
+		'searchdate': date_str,
+		'data': 'AP01',
+	}
+	
+	try:
+		response = requests.get(url, params=params)
+		return response.json()
+	except requests.exceptions.RequestException as e:
+		return {"error": f"환율 정보 조회 중 오류가 발생했습니다: {e}"}
+	except (KeyError, TypeError):
+		return {"error": "환율 정보의 형식이 예상과 다릅니다."}
 # 오늘 환율이 조회되지 않으면 어제 환율 조회되게 예외 처리
 def get_exchange_rate_info() -> dict:
-    today = datetime.today()
-    today_str = today.strftime('%Y%m%d')
-    yesterday = today - timedelta(days=1)
-    yesterday_str = yesterday.strftime('%Y%m%d')
+	today = datetime.today()
+	today_str = today.strftime('%Y%m%d')
+	yesterday = today - timedelta(days=1)
+	yesterday_str = yesterday.strftime('%Y%m%d')
 
-    # 오늘 날짜로 먼저 시도
-    today_data = _fetch_exchange_rate(today_str)
-    if today_data and "error" not in today_data and len(today_data) > 0:
-        return today_data
-    
-    # 오늘 날짜 데이터가 없거나 오류 발생 시 어제 날짜로 시도
-    yesterday_data = _fetch_exchange_rate(yesterday_str)
-    if yesterday_data and "error" not in yesterday_data and len(yesterday_data) > 0:
-        return yesterday_data
-    
-    # 두 시도 모두 실패
-    return {"error": "환율 정보를 가져오는 데 실패했습니다. 오늘 및 어제 날짜의 데이터를 찾을 수 없습니다."}
+	# 오늘 날짜로 먼저 시도
+	today_data = _fetch_exchange_rate(today_str)
+	if today_data and "error" not in today_data and len(today_data) > 0:
+		return today_data
+	
+	# 오늘 날짜 데이터가 없거나 오류 발생 시 어제 날짜로 시도
+	yesterday_data = _fetch_exchange_rate(yesterday_str)
+	if yesterday_data and "error" not in yesterday_data and len(yesterday_data) > 0:
+		return yesterday_data
+	
+	# 두 시도 모두 실패
+	return {"error": "환율 정보를 가져오는 데 실패했습니다. 오늘 및 어제 날짜의 데이터를 찾을 수 없습니다."}
 
 # 시장 지수 설명
 def get_kr_indices(market_type):
