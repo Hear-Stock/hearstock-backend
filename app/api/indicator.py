@@ -41,9 +41,11 @@ def explain_metric(
 
 	# 단위 제거
 	def sanitize_float_string(s):
-		if not s or s == "N/A":
-			return None
-		return s.replace(",", "").replace("%", "").replace("배", "").strip()
+		if isinstance(s, str):
+			if not s or s == "N/A":
+				return None
+			return s.replace(",", "").replace("%", "").replace("배", "").strip()
+		return s
 
 	try:
 		value = float(sanitize_float_string(value_str))
