@@ -5,12 +5,12 @@ from app.api import stock, indicator, investment, intent, naverNews
 app = FastAPI()
 
 origins = [
-    "http://localhost:3000"
+    "http://localhost:7789"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"]
