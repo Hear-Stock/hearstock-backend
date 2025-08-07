@@ -5,7 +5,8 @@ from app.api import stock, indicator, investment, intent, naverNews
 app = FastAPI()
 
 origins = [
-    "http://localhost:7789"
+    "http://localhost:7789",
+    "http://localhost:3000"
 ]
 
 app.add_middleware(
