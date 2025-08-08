@@ -71,53 +71,18 @@ def extract_intent(text: str):
         if not required_keys.issubset(parsed.keys()):
             return None
 
-        # chart인데 period가 없으면 기본값 적용
+        # chart인데 period가 없으면 기본값 3개월 적용
         if parsed["intent"] == "chart":
             parsed["period"] = parsed.get("period", "3mo")
 
-        return parsed
-    except json.JSONDecodeError:
-        return None
+        # indicator일 때는 prefix 제거
+        if parsed["intent"] == "indicator":
+            parsed["code"] = parsed["code"].split('.')[0]
 
-def extract_price_info(text: str):
-    prompt = """
-    다음 문장에서 주식 종목명과 사용자의 의도, 시장을 JSON 형식으로 반환하세요.
+        # 해외 주식이면 prefix 제거
+        if parsed["market"] == "US" and "." in parsed["code"]:
+            parsed["code"] = parsed["code"].split('.')[0]
 
-    - intent는 다음 중 하나: current_price, high_limit, low_limit, indicator
-    - code는 종목 코드 (예: 삼성전자 → 005930, 테슬라 → TSLA)
-    - market은 "KR" (한국) 또는 "US" (미국)
-
-    예시:
-    "삼성전자 상한가 알려줘" → {
-    "name": "삼성전자",
-    "code": "005930",
-    "intent": "high_limit",
-    "market": "KR"
-    }
-
-    "애플 투자지표 알려줘" → {
-    "name": "애플",
-    "code": "AAPL",
-    "intent": "indicator",
-    "market": "US"
-    }
-
-    JSON 외에 아무 설명도 출력하지 마세요.
-    """
-
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": text}
-        ]
-    )
-
-    result = response.choices[0].message.content.strip()
-    try:
-        parsed = json.loads(result)
-        if not all(k in parsed for k in ("name", "code", "intent")):
-            return None
         return parsed
     except json.JSONDecodeError:
         return None
