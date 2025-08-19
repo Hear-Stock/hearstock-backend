@@ -29,8 +29,12 @@ def get_kiwoom_token():
 
     response = requests.post(url, headers=headers, json=params)
     response.raise_for_status()
-    response = response.json()
-    return response['token']
+    data = response.json()
+
+    token = data.get('access_token') or data.get('token') or data.get('accessToken')
+    if not token:
+        raise ValueError(f"Token missing in response: {data}")
+    return token
 
 def fn_ka10081(token, cont_yn='N', next_key='', code="", date="20250501"):
     host = 'https://mockapi.kiwoom.com'
