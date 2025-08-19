@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from .kiwoom_service import fetch_chart_data
 
 load_dotenv()
-REDIS_HOST = os.getenv("REDIS_HOST", "redis_server")
+REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_DB = int(os.getenv("REDIS_DB", 0))
 
