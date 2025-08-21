@@ -14,13 +14,16 @@ def parse_intent(req: TextRequest):
     if not parsed:
         return {"error": "GPT 파싱 실패 또는 알 수 없는 요청"}
 
-    intent = parsed["intent"]
-    code = parsed["code"]
-    name = parsed["name"]
-    market = parsed.get("market", "KR")
+    intent = parsed.get("intent")
+
+    if not intent:
+        return {"error": "intent를 추출하지 못했습니다."}
 
     if intent == "chart":
-        period = parsed.get("period", "3mo")  # 기본값 지정
+        code = parsed.get("code")
+        name = parsed.get("name")
+        market = parsed.get("market", "KR")
+        period = parsed.get("period", "3mo")
         return {
             "name": name,
             "code": code,
@@ -31,15 +34,47 @@ def parse_intent(req: TextRequest):
         }
 
     elif intent == "indicator":
+        code = parsed.get("code")
+        name = parsed.get("name")
+        market = parsed.get("market", "KR")
+        indicator_type = parsed.get("indicator_type")
+        path = f"/api/indicator?code={code}&market={market}"
+        if indicator_type:
+            path += f"&intent={indicator_type}"
         return {
             "name": name,
             "code": code,
             "market": market,
             "intent": "indicator",
-            "path": f"/api/indicator?code={code}&market={market}"
+            "indicator_type": indicator_type,
+            "path": path
+        }
+
+    elif intent == "exchange_rate":
+        country = parsed.get("country")
+        if not country:
+            return {"error": "국가 이름이 필요합니다."}
+        # 참고: investment API는 파라미터 이름으로 'contry'를 사용합니다.
+        return {
+            "intent": "exchange_rate",
+            "country": country,
+            "path": f"/api/investment/exchange?contry={country}"
+        }
+
+    elif intent == "market_index":
+        market_name = parsed.get("market_name")
+        if not market_name:
+            return {"error": "시장 이름이 필요합니다. (예: 코스피, 나스닥)"}
+        return {
+            "intent": "market_index",
+            "market_name": market_name,
+            "path": f"/api/investment/indices?market={market_name}"
         }
 
     elif intent in ["current_price", "high_limit", "low_limit"]:
+        code = parsed.get("code")
+        name = parsed.get("name")
+        market = parsed.get("market", "KR")
         return {
             "name": name,
             "code": code,

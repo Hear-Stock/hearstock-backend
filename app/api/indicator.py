@@ -3,16 +3,58 @@ from app.services.indicator_service import get_investment_metrics, get_financial
 
 router = APIRouter(prefix="/api/indicator", tags=["Indicator"])
 
+KEYS = {
+    "시가총액": "market_cap",
+    "시가총액순위": "market_rank",
+    "매출액": "revenue",
+    "주가매출비율": "psr",
+    "주가수익비율": "per",
+    "주가순자산비율": "pbr",
+    "배당수익률": "dividend_yield",
+    "자기자본이익률": "roe",
+    "외국인소진율": "foreign_ownership",
+    "동일업종명": "industry_name",
+    "투자의견": "opinion",
+    "목표주가": "target_price",
+    "동일업종PER": "industry_per",
+    "등락률": "industry_rate",
+    "corp_name": "corp_name",
+    "market_cap": "market_cap",
+    "market_rank": "market_rank",
+    "revenue": "revenue",
+    "psr": "psr",
+    "per": "per",
+    "pbr": "pbr",
+    "dividend_yield": "dividend_yield",
+    "roe": "roe",
+    "foreign_ownership": "foreign_ownership",
+    "industry_name": "industry_name",
+    "opinion": "opinion",
+    "target_price": "target_price",
+    "industry_per": "industry_per",
+    "industry_rate": "industry_rate"
+}
+
 # 투자지표 조회 (쿼리 기반)
 @router.get("/")
 def get_investment_info(
 	code: str = Query(..., description="종목 코드 (예: 005930, TSLA 등)"),
-	market: str = Query("KR", description="시장 구분 (KR | US)")
+	market: str = Query("KR", description="시장 구분 (KR | US)"),
+	intent: str = Query("", description="원하는 정보 (예: 시가총액, 매출액, 등락률, PSR )")
 ):
 	data = get_investment_metrics(code, market)
 	if "error" in data:
 		return {"error": data["error"]}
-	return data
+	# intent가 없으면 모두 모든 data return
+	if intent == "":
+		return data
+	
+	info_key = KEYS.get(intent, intent.lower())
+	
+	if info_key in data:
+		return {info_key: data[info_key]}
+	else:
+		return {"error": f"'{intent}' not found in investment info"}
 
 # 특정 지표 설명 조회 (쿼리 기반)
 @router.get("/explain")
