@@ -5,7 +5,8 @@ import subprocess
 import uuid
 import json
 import asyncio
-import websockets 
+import websockets
+from websockets.protocol import State 
 
 from app.services.stock_service import get_stock_chart, get_price, get_overseas_price
 from app.api.kiwoomREST import get_kiwoom_token,get_stock_code, get_stocks_by_keyword
@@ -261,7 +262,7 @@ class KiwoomWebSocketProxy:
     async def disconnect(self):
         self.is_running = False
         
-        if self.kiwoom_ws and not self.kiwoom_ws.closed.is_set():
+        if self.kiwoom_ws and self.kiwoom_ws.state != State.CLOSED:
             if self.registered_groups:
                 print(f"저장된 모든 그룹({self.registered_groups})에 대해 구독 해지를 시도합니다.")
                 for grp_no in list(self.registered_groups):
