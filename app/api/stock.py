@@ -212,19 +212,44 @@ class KiwoomWebSocketProxy:
                 print(f"클라이언트로부터 메시지 수신: {message_text}")
                 
                 try:
-                    message_data = json.loads(message_text)
-                    trnm = message_data.get('trnm')
-                    grp_no = message_data.get('grp_no')
-                    if trnm == 'REG' and grp_no:
-                        self.registered_groups.add(grp_no)
-                        print(f"구독 그룹 추가: {grp_no}, 현재 그룹: {self.registered_groups}")
-                    elif trnm == 'REMOVE' and grp_no:
-                        self.registered_groups.discard(grp_no)
-                        print(f"구독 그룹 제거: {grp_no}, 현재 그룹: {self.registered_groups}")
-                except json.JSONDecodeError:
-                    pass # JSON 형식이 아니면 그냥 전달
+                    client_data = json.loads(message_text)
+                    action = client_data.get('action')
+                    stock_code = client_data.get('code')
 
-                await self.kiwoom_ws.send(message_text)
+                    if action == 'subscribe' and stock_code:
+                        kiwoom_stock_code = stock_code.split('.')[0]
+                        grp_no = "1"  # Using a fixed group number for simplicity
+                        
+                        subscription_msg = {
+                            'trnm': 'REG',
+                            'grp_no': grp_no,
+                            'refresh': '1',
+                            'data': [{
+                                'item': [f'{kiwoom_stock_code}'],
+                                'type': ['0B'],
+                            }]
+                        }
+                        
+                        await self.kiwoom_ws.send(json.dumps(subscription_msg))
+                        self.registered_groups.add(grp_no)
+                        print(f"Kiwoom으로 구독 메시지 전송: {subscription_msg}")
+
+                    elif action == 'unsubscribe':
+                        grp_no = "1" # Using a fixed group number
+                        unsub_msg = {
+                            'trnm': 'REMOVE',
+                            'grp_no': grp_no,
+                        }
+                        await self.kiwoom_ws.send(json.dumps(unsub_msg))
+                        self.registered_groups.discard(grp_no)
+                        print(f"Kiwoom으로 구독 해지 메시지 전송: {unsub_msg}")
+
+                    else:
+                        print(f"알 수 없는 액션 또는 잘못된 메시지 형식: {client_data}")
+
+                except json.JSONDecodeError:
+                    print(f"클라이언트로부터 받은 메시지가 JSON 형식이 아님: {message_text}")
+
             except WebSocketDisconnect:
                 print("클라이언트가 FastAPI WebSocket에서 연결을 끊었습니다.")
                 break
