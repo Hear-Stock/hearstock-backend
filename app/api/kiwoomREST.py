@@ -7,6 +7,7 @@ import pandas as pd
 from datetime import datetime
 from dotenv import load_dotenv
 from app.db.redis_service import get_redis, get_cache, set_cache
+from app.errors import StockAPIException
 
 
 load_dotenv()
@@ -24,7 +25,7 @@ def try_post(url, headers, params, timeout=5):
 		response.raise_for_status()
 		return response.json()
 	except requests.exceptions.RequestException as e:
-		return {"error": f"요청 실패: {str(e)}"}
+		raise StockAPIException(status_code=500, detail=f"요청 실패: {str(e)}")
 
 
 # 접근토큰 발급
@@ -57,15 +58,12 @@ def get_kiwoom_token():
 
 	response = try_post(url, headers, params)
 
-	if "error" in response:
-		return {"error": f"토큰 요청 실패: {response['error']}"}
-
 	try:
 		token = response["token"]
 		set_cache(r, cache_key, token, 3600)
 		return token
 	except (KeyError, redis.RedisError) as e:
-		return {"error": f"토큰 저장 또는 응답 파싱 실패: {str(e)}"}
+		raise StockAPIException(status_code=500, detail=f"토큰 저장 또는 응답 파싱 실패: {str(e)}")
 
 
 # 주식기본정보요청
@@ -91,11 +89,7 @@ def get_kiwoom_stkinfo(token, cont_yn='N', next_key='', code=""):
 	}
 
 	# 3. http POST 요청
-	response = try_post(url, headers, params)
-
-	if "error" in response:
-		return {"error": f"기본 정보 조회 실패: {response['error']}"}
-	return response
+	return try_post(url, headers, params)
 
 
 # 일봉차트 전체 조회
@@ -131,9 +125,7 @@ def get_kiwoom_stock_chart(token, code, date=datetime.now().strftime("%Y%m%d")):
 			response.raise_for_status()
 			data_json = response.json()
 		except requests.exceptions.RequestException as e:
-			print(f"[ERROR] 요청 실패: {e}")
-			response.failure(f"error: {e}")
-			return None
+			raise StockAPIException(status_code=500, detail=f"[ERROR] 요청 실패: {e}")
 
 		next_key_val = response.headers.get("next-key")
 		data = data_json.get("stk_dt_pole_chart_qry", [])
@@ -184,7 +176,7 @@ def get_kiwoom_stock_chart(token, code, date=datetime.now().strftime("%Y%m%d")):
 		return df_filtered
 
 	except Exception as e:
-		print(f"[ERROR] 데이터 가공 실패: {e}")
+		raise StockAPIException(status_code=500, detail=f"[ERROR] 데이터 가공 실패: {e}")
 	
 	return pd.DataFrame()
 
@@ -251,11 +243,7 @@ def get_industry_price(token, code, cont_yn='N', next_key=''):
 	}
 
 	# 3. http POST 요청
-	response = try_post(url, headers, params)
-
-	if "error" in response:
-		return {"error": f"기본 정보 조회 실패: {response['error']}"}
-	return response
+	return try_post(url, headers, params)
 
 
 # 테마그룹별요청
@@ -394,14 +382,11 @@ def get_stock_code(token, company_name, market='0'):
 
 	response = try_post(url, headers, params)
 
-	if "error" in response:
-		return {"error": f"종목코드 조회 실패: {response['error']}"}
-
 	for stock in response.get('list', []):
 		if stock.get('name') == company_name:
 			return {stock['name']: stock['code']}
 
-	return {"error": f"'{company_name}'에 해당하는 종목을 찾을 수 없습니다."}
+	raise StockAPIException(status_code=404, detail=f"'{company_name}'에 해당하는 종목을 찾을 수 없습니다.")
 
 
 # 기업 목록 조회 함수
@@ -426,13 +411,13 @@ def get_stocks_by_keyword(token, keyword, market='0'):
 
 	response = try_post(url, headers, params)
 
-	if "error" in response:
-		return {"error": f"종목 목록 조회 실패: {response['error']}"}
-
 	matches = {
 		stock['name']: stock['code']
 		for stock in response.get('list', [])
 		if keyword in stock.get('name', '')
 	}
 
-	return matches or {"error": f"'{keyword}'를 포함하는 종목을 찾을 수 없습니다."}
+	if not matches:
+		raise StockAPIException(status_code=404, detail=f"'{keyword}'를 포함하는 종목을 찾을 수 없습니다.")
+
+	return matches

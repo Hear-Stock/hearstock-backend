@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import json
 from app.api import kiwoomREST
+from app.errors import StockAPIException
 
 load_dotenv()
 # 환율 정보 API 키 로드
@@ -15,7 +16,7 @@ EXCHANGE_RATE_KEY = os.getenv("EXCHANGE_RATE_KEY")
 def _fetch_exchange_rate(date_str: str) -> dict:
 	# url = "https://www.koreaexim.go.kr/site/program/financial/exchangeJSON"
 	url = "https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON"
-	
+		  
 	params = {
 		'authkey': EXCHANGE_RATE_KEY,
 		'searchdate': date_str,
@@ -24,30 +25,38 @@ def _fetch_exchange_rate(date_str: str) -> dict:
 	
 	try:
 		response = requests.get(url, params=params)
+		response.raise_for_status()
 		return response.json()
 	except requests.exceptions.RequestException as e:
-		return {"error": f"환율 정보 조회 중 오류가 발생했습니다: {e}"}
+		raise StockAPIException(status_code=500, detail=f"환율 정보 조회 중 오류가 발생했습니다: {e}")
 	except (KeyError, TypeError):
-		return {"error": "환율 정보의 형식이 예상과 다릅니다."}
+		raise StockAPIException(status_code=500, detail="환율 정보의 형식이 예상과 다릅니다.")
+
 # 오늘 환율이 조회되지 않으면 어제 환율 조회되게 예외 처리
 def get_exchange_rate_info() -> dict:
 	today = datetime.today()
 	today_str = today.strftime('%Y%m%d')
 	yesterday = today - timedelta(days=1)
 	yesterday_str = yesterday.strftime('%Y%m%d')
-
+	
 	# 오늘 날짜로 먼저 시도
-	today_data = _fetch_exchange_rate(today_str)
-	if today_data and "error" not in today_data and len(today_data) > 0:
-		return today_data
+	try:
+		today_data = _fetch_exchange_rate(today_str)
+		if today_data and len(today_data) > 0:
+			return today_data
+	except StockAPIException:
+		pass # 오늘 데이터 없으면 그냥 넘어감
 	
 	# 오늘 날짜 데이터가 없거나 오류 발생 시 어제 날짜로 시도
-	yesterday_data = _fetch_exchange_rate(yesterday_str)
-	if yesterday_data and "error" not in yesterday_data and len(yesterday_data) > 0:
-		return yesterday_data
+	try:
+		yesterday_data = _fetch_exchange_rate(yesterday_str)
+		if yesterday_data and len(yesterday_data) > 0:
+			return yesterday_data
+	except StockAPIException as e:
+		raise e # 어제 데이터도 없으면 최종 에러
 	
 	# 두 시도 모두 실패
-	return {"error": "환율 정보를 가져오는 데 실패했습니다. 오늘 및 어제 날짜의 데이터를 찾을 수 없습니다."}
+	raise StockAPIException(status_code=404, detail="환율 정보를 가져오는 데 실패했습니다. 오늘 및 어제 날짜의 데이터를 찾을 수 없습니다.")
 
 # 시장 지수 설명
 def get_kr_indices(market_type):
@@ -62,11 +71,11 @@ def get_kr_indices(market_type):
 		market="코스닥"
 	else:
 		# 유효하지 않은 market_type에 대한 오류 반환
-		return json.dumps({"error": "유효하지 않은 market_type입니다. 'kospi' 또는 'kosdaq'을 사용하세요."})
+		raise StockAPIException(status_code=400, detail="유효하지 않은 market_type입니다. 'kospi' 또는 'kosdaq'을 사용하세요.")
 	
 	# Kiwoom REST API를 통해 시장 지수 정보 가져오기
-	indice = kiwoomREST.get_industry_price(kiwoomREST.get_kiwoom_token(), code=code)['all_inds_idex'][0]
 	try:
+		indice = kiwoomREST.get_industry_price(kiwoomREST.get_kiwoom_token(), code=code)['all_inds_idex'][0]
 		# 지수 정보 파싱 및 요약
 		indice_price = abs(float(indice.get('cur_prc')))
 		indice_pred = indice.get('pred_pre')
@@ -85,10 +94,7 @@ def get_kr_indices(market_type):
 
 	except (IndexError, KeyError) as e:
 		# 지수 정보 파싱 오류 처리
-		market_index_summary = "시장 지수 정보를 가져오는 데 실패했습니다."
-		print(f"Error parsing market index: {e}")
-
-	return market_index_summary
+		raise StockAPIException(status_code=500, detail=f"시장 지수 정보를 가져오는 데 실패했습니다: {e}")
 
 # Investing.com에서 주요 해외 지수를 크롤링하여 정보를 반환합니다.
 def get_world_indices():
@@ -106,7 +112,7 @@ def get_world_indices():
 		table = soup.find('table', class_='datatable-v2_table__93S4Y')
 		if not table:
 			# 테이블을 찾을 수 없는 경우 오류 반환
-			return {"error": "해외 주요 지수 정보를 찾을 수 없습니다."}
+			raise StockAPIException(status_code=404, detail="해외 주요 지수 정보를 찾을 수 없습니다.")
 
 		indices_data = []
 		# 테이블의 각 행을 순회하며 데이터 추출
@@ -135,13 +141,13 @@ def get_world_indices():
 
 		if not indices_data:
 			# 파싱된 데이터가 없는 경우 오류 반환
-			return {"error": "해외 주요 지수 데이터를 파싱할 수 없습니다."}
+			raise StockAPIException(status_code=500, detail="해외 주요 지수 데이터를 파싱할 수 없습니다.")
 
 		return indices_data[3:]
 
 	except Exception as e:
 		# 크롤링 중 발생한 예외 처리
-		return {"error": f"해외 주요 지수 정보를 가져오는 중 오류가 발생했습니다: {e}"}
+		raise StockAPIException(status_code=500, detail=f"해외 주요 지수 정보를 가져오는 중 오류가 발생했습니다: {e}")
 	
 
 if __name__ == "__main__":

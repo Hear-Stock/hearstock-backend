@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import yfinance as yf
+from app.errors import StockAPIException
 
 # 숫자 추출 및 소수점 1자리 반올림
 def extract_number(text: str) -> str:
@@ -194,7 +195,7 @@ def crawl_investment_metrics(stock_code: str) -> dict:
         }
 
     except Exception as e:
-        return {"error": str(e)}
+        raise StockAPIException(status_code=500, detail=str(e))
 
 def get_us_investment_metrics(symbol: str) -> dict:
     try:
@@ -211,7 +212,7 @@ def get_us_investment_metrics(symbol: str) -> dict:
             "psr": str(info.get("priceToSalesTrailing12Months", "N/A")),
         }
     except Exception as e:
-        return {"error": f"yfinance error: {e}"}
+        raise StockAPIException(status_code=500, detail=f"yfinance error: {e}")
 
 def get_investment_metrics(code: str, market: str):
     if market == "KR":
@@ -219,7 +220,7 @@ def get_investment_metrics(code: str, market: str):
     elif market == "US":
         return get_us_investment_metrics(code)  # yfinance API
     else:
-        return {"error": f"Unsupported market: {market}"}
+        raise StockAPIException(status_code=400, detail=f"Unsupported market: {market}")
     
 
 # --- 용어 사전 ---
@@ -242,7 +243,7 @@ def get_financial_definition(term: str) -> str:
 	if definition:
 		return definition
 	else:
-		return f"죄송합니다, 요청하신 용어 '{term}'에 대한 정보를 찾을 수 없습니다."
+		raise StockAPIException(status_code=404, detail=f"죄송합니다, 요청하신 용어 '{term}'에 대한 정보를 찾을 수 없습니다.")
 
 
 # 실행 예시
