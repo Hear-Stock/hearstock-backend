@@ -1,10 +1,7 @@
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, Query, HTTPException
+from datetime import datetime
 from pydantic import BaseModel
-import os
-import subprocess
-import uuid
-import json
-from app.services.stock_service import get_stock_chart, get_price, get_overseas_price
+from app.services.stock_service import get_stock_chart, get_price, get_overseas_price, get_stock_chart_range
 from app.api.kiwoomREST import get_kiwoom_token,get_stock_code, get_stocks_by_keyword
 
 router = APIRouter(prefix="/api/stock", tags=["Stock"])
@@ -64,49 +61,36 @@ def get_chart_direct(req: ChartDirectRequest):
 
     return get_stock_chart(req.stock_code, req.period, req.market)
 
-# @router.get("/generate-audio")
-# def generate_audio_by_stock(
-#     code: str = Query(..., description="야후 파이낸스 형식의 종목 코드 (예: 005930.KS, TSLA)"),
-#     period: str = Query("1mo", description="차트 기간 (예: 1mo, 3mo 등)"),
-#     market: str = Query(None, description="시장 구분 (KR | US), 생략 시 자동 추론")
-# ):
-#     # 시장 추론
-#     final_market = market or infer_market(code)
+@router.get("/chart/range")
+def get_chart_by_range(
+    code: str = Query(..., description="야후 파이낸스 형식의 종목 코드 (예: 005930.KS, TSLA)"),
+    start: str = Query(..., description="드래그 시작일 (YYYY-MM-DD)"),
+    end: str = Query(..., description="드래그 종료일 (YYYY-MM-DD)"),
+    market: str = Query(None, description="시장 구분 (KR | US), 생략 시 자동 추론")
+):
+    final_market = market or infer_market(code)
 
-#     # 유효성 검사
-#     if not validate_market_match(code, final_market):
-#         return Response(content="시장/코드 불일치", status_code=400)
+    if not validate_market_match(code, final_market):
+        raise HTTPException(status_code=400, detail=f"종목 코드 '{code}'와 시장 '{final_market}'이(가) 일치하지 않습니다.")
 
-#     # 차트 데이터 가져오기
-#     chart_data = get_stock_chart(code, period, final_market)
-#     if not chart_data or len(chart_data) == 0:
-#         return Response(content="차트 데이터 없음", status_code=404)
+    try:
+        start_date = datetime.strptime(start, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end, "%Y-%m-%d").date()
+        if start_date > end_date:
+            raise HTTPException(status_code=400, detail="시작일이 종료일보다 늦습니다.")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="날짜 형식이 잘못되었습니다 (YYYY-MM-DD)")
 
-#     # 고유 파일 이름 생성
-#     uid = uuid.uuid4().hex
-#     json_file = f"stock_data_{uid}.json"
-#     wav_file = f"output_{uid}.wav"
+    data = get_stock_chart_range(code, start_date, end_date, final_market)
 
-#     # JSON 파일로 저장
-#     with open(json_file, "w") as f:
-#         json.dump(chart_data, f)
-
-#     # C++ 실행
-#     result = subprocess.run(["./hrtf_converter", json_file, wav_file])
-
-#     # 실패 시
-#     if result.returncode != 0 or not os.path.exists(wav_file):
-#         return Response(content="HRTF 변환 실패", status_code=500)
-
-#     # WAV 반환
-#     with open(wav_file, "rb") as f:
-#         audio_bytes = f.read()
-
-#     # 임시 파일 삭제
-#     os.remove(json_file)
-#     os.remove(wav_file)
-
-#     return Response(content=audio_bytes, media_type="audio/wav")
+    return {
+        "meta": {
+            "code": code,
+            "period": {"start": start, "end": end},
+            "count": len(data)
+        },
+        "data": data
+    }
 
 @router.get("/findcode")
 def get_code(company_name: str = Query(..., description="기업 이름 입력 예) 삼성전자, SK하이닉스")

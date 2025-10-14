@@ -7,7 +7,7 @@ import yfinance as yf
 import os
 from dotenv import load_dotenv
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, date
 from .kiwoom_service import fetch_chart_data
 
 load_dotenv()
@@ -185,3 +185,32 @@ def get_stock_chart(stock_code: str, period: str, market: str = None):
 
     r.setex(cache_key, 3600, json.dumps(result))
     return result
+
+def get_stock_chart_range(stock_code: str, start: date, end: date, market: str = None):
+    cache_key = f"chart_range:{stock_code}:{start}:{end}:{market}"
+
+    # Redis 캐시 확인
+    cached = r.get(cache_key)
+    if cached:
+        try:
+            return json.loads(cached)
+        except json.JSONDecodeError:
+            pass
+
+    # 3개월치 데이터를 가져와서 필터링 (이미 캐시되어 있을 가능성 높음)
+    full_data = get_stock_chart(stock_code, "3mo", market)
+
+    # 에러가 반환된 경우 그대로 전달
+    if isinstance(full_data, dict) and "error" in full_data:
+        return full_data
+
+    # 날짜 필터링
+    filtered = [
+        item for item in full_data
+        if start <= datetime.strptime(item["timestamp"], "%Y-%m-%d").date() <= end
+    ]
+
+    # Redis에 캐싱 (1시간 TTL)
+    r.setex(cache_key, 3600, json.dumps(filtered))
+
+    return filtered
