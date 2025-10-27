@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query
 from app.services.investment_service import get_exchange_rate_info, get_kr_indices, get_world_indices
-
+from app.errors import StockAPIException
 
 router = APIRouter(prefix="/api/investment", tags=["investment"])
 
@@ -10,10 +10,6 @@ def get_exchange_rate(
 	contry: str = Query("", description="국가 입력 예) 미국, 일본")
 ):
 	data = get_exchange_rate_info()
-
-	# API 호출 결과가 에러인지 먼저 확인
-	if isinstance(data, dict) and "error" in data:
-		return data
 
 	# 성공 시, 국가 정보 검색
 	for i in data:
@@ -26,7 +22,7 @@ def get_exchange_rate(
             }
 	
 	# 반복문이 끝날 때까지 국가를 찾지 못한 경우
-	return {"error": f"'{contry}'에 대한 환율 정보를 찾을 수 없습니다."}
+	raise StockAPIException(status_code=404, detail=f"'{contry}'에 대한 환율 정보를 찾을 수 없습니다.")
 	
 @router.get("/indices")
 def get_kr_indece(
@@ -42,5 +38,5 @@ def get_kr_indece(
 			if market in i["indice_name"]:
 				return i
 		
-		return {"error" : "입력한 시장 지수 정보가 존재하지 않습니다."}
+		raise StockAPIException(status_code=404, detail="입력한 시장 지수 정보가 존재하지 않습니다.")
 

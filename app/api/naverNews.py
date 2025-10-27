@@ -7,7 +7,7 @@ import requests
 from dotenv import load_dotenv
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
-
+from app.errors import StockAPIException
 
 
 router = APIRouter(prefix="/api/news", tags=["News"])
@@ -67,7 +67,7 @@ def searchNews(query
 
         return result
     else:
-        return {"Error:", response.text}
+        raise StockAPIException(status_code=response.status_code, detail=response.text)
     
 
 @router.get("/searchNews")
@@ -77,4 +77,4 @@ def get_news(
         , start: str = Query("1", description="검색 시작위치")
         , sort: str = Query("sim", description="sim: 정확도순으로 내림차순 정렬(기본값) date: 날짜순으로 내림차순 정렬") ):
 	
-	return  searchNews(query=query)
+	return  searchNews(query=query, display=display, start=start, sort=sort)

@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 import pandas as pd
 from datetime import datetime, date
 from .kiwoom_service import fetch_chart_data
+from app.errors import StockAPIException
 
 load_dotenv()
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
@@ -25,7 +26,7 @@ def get_overseas_price(symbol: str):
     data = ticker.history(period="1d", interval="1m")
 
     if data.empty:
-        return {"error": f"No data for {symbol}"}
+        raise StockAPIException(status_code=404, detail=f"No data for {symbol}")
 
     return {
         "code": symbol,
@@ -58,10 +59,7 @@ def get_domestic_price(code: str) -> dict:
         low_limit = None
 
     if not current_price or not high_limit or not low_limit:
-        return {
-            "error": "크롤링 실패",
-            "detail": f"current: {current_price}, high: {high_limit}, low: {low_limit}"
-        }
+        raise StockAPIException(status_code=500, detail=f"크롤링 실패: current: {current_price}, high: {high_limit}, low: {low_limit}")
 
     return {
         "code": code,
@@ -74,9 +72,6 @@ def get_domestic_price(code: str) -> dict:
 # 주가, 상한가, 하한가 조회
 def get_price(code: str, intent: str) -> dict:
     summary = get_domestic_price(code)
-    
-    if "error" in summary:
-        return summary
 
     name = summary.get("name")
 
@@ -87,7 +82,7 @@ def get_price(code: str, intent: str) -> dict:
     elif intent == "low_limit":
         return {"name": name, "low_limit": summary.get("low_limit")}
     else:
-        return {"error": f"지원하지 않는 intent: {intent}"}
+        raise StockAPIException(status_code=400, detail=f"지원하지 않는 intent: {intent}")
 
 # 환율 변환 함수   
 def get_usd_to_krw_rate():
@@ -117,7 +112,7 @@ def get_stock_chart(stock_code: str, period: str, market: str = None):
         df = fetch_chart_data(code=code, period=period)
 
         if isinstance(df, dict) and "error" in df:
-            return df
+            raise StockAPIException(status_code=500, detail=df["error"])
 
         df = pd.DataFrame(df)  
         df = df.replace([float('inf'), float('-inf')], pd.NA).fillna(0) # 결측치 처리
@@ -134,7 +129,7 @@ def get_stock_chart(stock_code: str, period: str, market: str = None):
             }
 
             if period not in period_map:
-                return {"error": f"지원하지 않는 기간: {period}"}
+                raise StockAPIException(status_code=400, detail=f"지원하지 않는 기간: {period}")
 
             interval = period_map[period]
 
@@ -143,7 +138,7 @@ def get_stock_chart(stock_code: str, period: str, market: str = None):
             df = ticker.history(period=period if period != "all" else "max", interval=interval)
 
             if df.empty:
-                return {"error": "No chart data available."}
+                raise StockAPIException(status_code=404, detail="No chart data available.")
 
             df = df.reset_index()
             df["timestamp"] = df["Date"].dt.strftime("%Y-%m-%d")
@@ -178,10 +173,10 @@ def get_stock_chart(stock_code: str, period: str, market: str = None):
                 result.append(item)
 
         except Exception as e:
-            return {"error": f"yfinance error: {e}"}
+            raise StockAPIException(status_code=500, detail=f"yfinance error: {e}")
 
     else:
-        return {"error": f"지원하지 않는 market: {market}"}
+        raise StockAPIException(status_code=400, detail=f"지원하지 않는 market: {market}")
 
     r.setex(cache_key, 3600, json.dumps(result))
     return result

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Query
 from app.services.indicator_service import get_investment_metrics, get_financial_definition, extract_number
+from app.errors import StockAPIException
 
 router = APIRouter(prefix="/api/indicator", tags=["Indicator"])
 
@@ -43,8 +44,6 @@ def get_investment_info(
 	intent: str = Query("", description="원하는 정보 (예: 시가총액, 매출액, 등락률, PSR )")
 ):
 	data = get_investment_metrics(code, market)
-	if "error" in data:
-		return {"error": data["error"]}
 	# intent가 없으면 모두 모든 data return
 	if intent == "":
 		return data
@@ -54,7 +53,7 @@ def get_investment_info(
 	if info_key in data:
 		return {info_key: data[info_key]}
 	else:
-		return {"error": f"'{intent}' not found in investment info"}
+		raise StockAPIException(status_code=404, detail=f"'{intent}' not found in investment info")
 
 # 특정 지표 설명 조회 (쿼리 기반)
 @router.get("/explain")
@@ -65,9 +64,6 @@ def explain_metric(
 ):
 	data = get_investment_metrics(code, market)
 
-	if "error" in data:
-		return {"text": f"해당 종목의 투자지표를 불러올 수 없습니다. ({data['error']})"}
-	
 	metric_upper = metric.upper()
 	# 값 할당
 	value_str = data.get(metric.lower())
@@ -76,7 +72,7 @@ def explain_metric(
 	corp_name = data.get("corp_name", "해당 종목")
 
 	if value_str is None or value_str == "N/A":
-		return {"text": f"{metric} 지표는 제공되지 않거나 유효한 값을 찾을 수 없습니다."}
+		raise StockAPIException(status_code=404, detail=f"{metric} 지표는 제공되지 않거나 유효한 값을 찾을 수 없습니다.")
 
 	summary_parts = []
 	summary_parts.append(f"{corp_name}의 {metric_upper} 값은 {value_str}입니다.")
@@ -126,9 +122,9 @@ def explain_metric(
 				summary_parts.append(f"PSR이 1.0보다 높은 {value}이므로, 매출액 대비 주가 수준을 추가적으로 분석해 볼 필요가 있습니다.")
 
 	except ValueError:
-		summary_parts.append(f"숫자로 변환할 수 없는 값이 있습니다.")
+		raise StockAPIException(status_code=500, detail="숫자로 변환할 수 없는 값이 있습니다.")
 	except Exception as e:
-		summary_parts.append(f"상세 분석 중 오류가 발생했습니다: {e}")
+		raise StockAPIException(status_code=500, detail=f"상세 분석 중 오류가 발생했습니다: {e}")
 
 
 	return {"metric": metric, "summary": " ".join(summary_parts)}

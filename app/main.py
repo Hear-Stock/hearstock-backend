@@ -1,8 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import stock, indicator, investment, intent, naverNews
+from app.errors import add_exception_handlers, StockAPIException
 
 app = FastAPI()
+
+add_exception_handlers(app)
 
 origins = [
     "http://localhost:7789",
