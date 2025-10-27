@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, WebSocket, WebSocketDisconnect
 from datetime import datetime
 from pydantic import BaseModel
 import os
@@ -14,7 +14,6 @@ from app.api.kiwoomREST import get_kiwoom_token,get_stock_code, get_stocks_by_ke
 from app.errors import StockAPIException
 from app.services.kiwoom_connection_manager import KiwoomConnectionManager as connection_manager
 
-logging.basicConfig(level=logging.INFO)
 
 ACCESS_TOKEN = get_kiwoom_token()  # 고객 Access Token
 
