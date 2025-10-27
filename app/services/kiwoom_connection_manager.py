@@ -4,9 +4,14 @@ import websockets
 from websockets.exceptions import ConnectionClosed
 from collections import defaultdict
 from fastapi import WebSocket
+from websockets.protocol import State
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 
 from app.api.kiwoomREST import get_kiwoom_token
+
 
 # socket 정보
 SOCKET_URL = 'wss://mockapi.kiwoom.com:10000/api/dostk/websocket'  # 모의투자 접속 URL
@@ -89,7 +94,7 @@ class KiwoomConnectionManager:
             self.reader_task.cancel()
             self.reader_task = None
         
-        if self.kiwoom_ws and self.kiwoom_ws.open:
+        if self.kiwoom_ws and self.kiwoom_ws.protocol.state != State.CLOSED:
             try:
                 await self.kiwoom_ws.close()
                 print("Kiwoom WebSocket 연결이 성공적으로 종료되었습니다.")
@@ -126,24 +131,26 @@ class KiwoomConnectionManager:
             while self.is_running:
                 message = await self.kiwoom_ws.recv()
                 data = json.loads(message)
-
+                print(self.subscriptions)
                 if data.get('trnm') == 'PING':
                     await self.kiwoom_ws.send(message)
                     continue
 
                 if data.get('trnm') == 'REAL':
-                    grp_no = data.get('grp_no')
-                    stock_code = self.grp_to_stock.get(grp_no)
-                    
-                    if not (stock_code and stock_code in self.subscriptions):
-                        continue
-
                     for info_map in data.get('data', []):
+                        current_stock_code = info_map.get('item')
+
                         if info_map.get('name') == "주식체결":
                             tick_info_map = info_map.get('values', {})
+                            체결시간 = tick_info_map.get('20', '')
+                            현재가 = abs(float(tick_info_map.get('10', 0)))
+                            전일대비 = float(tick_info_map.get('11', 0))
+                            등락률 = float(tick_info_map.get('12', 0))
+                            체결량 = int(tick_info_map.get('15', 0))
+                            logging.info(f"--- 실시간 체결 정보 ---\n체결시간: {체결시간}\n현재가: {현재가}\n전일대비: {전일대비}\n등락률: {등락률}\n체결량: {체결량}\n--------------------")
                             
                             trade_info = {
-                                "stock_code": stock_code,
+                                "stock_code": current_stock_code,
                                 "execution_time": tick_info_map.get('20', ''),
                                 "current_price": abs(float(tick_info_map.get('10', 0))),
                                 "change": float(tick_info_map.get('11', 0)),
@@ -151,11 +158,13 @@ class KiwoomConnectionManager:
                                 "volume": int(tick_info_map.get('15', 0))
                             }
                             
-                            new_message = json.dumps(trade_info)
                             
+                            new_message = json.dumps(trade_info)
+                            print(new_message)
+                            print(self.subscriptions[current_stock_code+".KS"])
                             await asyncio.gather(*[
                                 client.send_text(new_message)
-                                for client in self.subscriptions[stock_code]
+                                for client in self.subscriptions[current_stock_code+".KS"] # 임시로 .KS 추가
                             ])
         except ConnectionClosed:
             print("리더 작업 중 Kiwoom 연결이 끊겼습니다.")
@@ -194,7 +203,7 @@ class KiwoomConnectionManager:
                     'refresh': '1',
                     'data': [{'item': [stock_code.split('.')[0]], 'type': ['0B']}]
                 }
-                if self.is_running and self.kiwoom_ws.open:
+                if self.is_running and self.kiwoom_ws.protocol.state != State.CLOSED:
                     await self.kiwoom_ws.send(json.dumps(reg_msg))
                 else:
                     print("Kiwoom이 연결되지 않아 구독 요청을 보낼 수 없습니다.")
@@ -216,7 +225,7 @@ class KiwoomConnectionManager:
                     print(f"All clients for {stock_code} unsubscribed. Removing grp_no: {grp_no}")
 
                     remove_msg = {'trnm': 'REMOVE', 'grp_no': grp_no}
-                    if self.is_running and self.kiwoom_ws.open:
+                    if self.is_running and self.kiwoom_ws.protocol.state != State.CLOSED:
                         await self.kiwoom_ws.send(json.dumps(remove_msg))
                     else:
                         print("Kiwoom이 연결되지 않아 구독 해지 요청을 보낼 수 없습니다.")
