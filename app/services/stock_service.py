@@ -122,9 +122,11 @@ def get_stock_chart(stock_code: str, period: str, market: str = None):
     elif market == "US":
         try:
             period_map = {
+                "1mo": "1d",
                 "3mo": "1d",
                 "1y": "1wk",
                 "5y": "1mo",
+                "10y": "1mo",
                 "all": "1mo"
             }
 
