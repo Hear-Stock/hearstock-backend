@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Query, Response, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Query, HTTPException
+from datetime import datetime
 from pydantic import BaseModel
 import os
 import subprocess
@@ -8,8 +9,7 @@ import asyncio
 import websockets
 from websockets.protocol import State 
 import logging
-
-from app.services.stock_service import get_stock_chart, get_price, get_overseas_price
+from app.services.stock_service import get_stock_chart, get_price, get_overseas_price, get_stock_chart_range
 from app.api.kiwoomREST import get_kiwoom_token,get_stock_code, get_stocks_by_keyword
 from app.errors import StockAPIException
 from app.services.kiwoom_connection_manager import KiwoomConnectionManager as connection_manager
@@ -118,6 +118,36 @@ def generate_audio_by_stock(
     os.remove(wav_file)
 
     return Response(content=audio_bytes, media_type="audio/wav")
+@router.get("/chart/range")
+def get_chart_by_range(
+    code: str = Query(..., description="야후 파이낸스 형식의 종목 코드 (예: 005930.KS, TSLA)"),
+    start: str = Query(..., description="드래그 시작일 (YYYY-MM-DD)"),
+    end: str = Query(..., description="드래그 종료일 (YYYY-MM-DD)"),
+    market: str = Query(None, description="시장 구분 (KR | US), 생략 시 자동 추론")
+):
+    final_market = market or infer_market(code)
+
+    if not validate_market_match(code, final_market):
+        raise HTTPException(status_code=400, detail=f"종목 코드 '{code}'와 시장 '{final_market}'이(가) 일치하지 않습니다.")
+
+    try:
+        start_date = datetime.strptime(start, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end, "%Y-%m-%d").date()
+        if start_date > end_date:
+            raise HTTPException(status_code=400, detail="시작일이 종료일보다 늦습니다.")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="날짜 형식이 잘못되었습니다 (YYYY-MM-DD)")
+
+    data = get_stock_chart_range(code, start_date, end_date, final_market)
+
+    return {
+        "meta": {
+            "code": code,
+            "period": {"start": start, "end": end},
+            "count": len(data)
+        },
+        "data": data
+    }
 
 @router.get("/findcode")
 def get_code(company_name: str = Query(..., description="기업 이름 입력 예) 삼성전자, SK하이닉스")
