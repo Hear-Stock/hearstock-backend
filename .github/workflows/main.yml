@@ -18,21 +18,20 @@ jobs:
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
+          username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           source: "."
           target: "/home/ubuntu/fastapi-app"
           strip_components: 1
-          debug: true
 
       - name: SSH into EC2 and deploy
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
+          username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            cd /home/ubuntu/fastapi-app
+            cd ~/fastapi-app
 
             echo "🛑 Stop and remove existing containers"
             docker-compose down || true

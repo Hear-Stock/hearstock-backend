@@ -111,9 +111,11 @@ def fetch_chart_data(code: str, period: str = "3mo"):
         # 기간 필터
         end_date = datetime.now()
         start_date = {
+            "1mo": end_date - timedelta(days=30),
             "3mo": end_date - timedelta(days=91),
             "1y": end_date - timedelta(days=365),
             "5y": end_date - timedelta(days=1825),
+            "10y": end_date - timedelta(days=3650),
             "all": datetime.min
         }.get(period, None)
 
