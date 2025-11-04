@@ -120,7 +120,7 @@ def extract_intent(text: str):
 
         # chart인데 period가 없으면 기본값 3개월 적용
         if parsed.get("intent") == "chart":
-            parsed["period"] = parsed.get("period", "3mo")
+            parsed["intent"] = "realtime_chart" # 기간 없으면 실시간 차트로 보여줘야함
 
         # indicator일 때는 prefix 제거
         if parsed.get("intent") == "indicator":
