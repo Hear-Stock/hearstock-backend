@@ -118,9 +118,9 @@ def extract_intent(text: str):
         json_string = result[json_start:json_end]
         parsed = json.loads(json_string)
 
-        # chart인데 period가 없으면 기본값 3개월 적용
-        if parsed.get("intent") == "chart":
-            parsed["intent"] = "realtime_chart" # 기간 없으면 실시간 차트로 보여줘야함
+        # chart인데 기간 언급이 없으면 실시간 차트로 변경
+        if parsed.get("intent") == "chart" and not parsed.get("period"):
+            parsed["intent"] = "realtime_chart"
 
         # indicator일 때는 prefix 제거
         if parsed.get("intent") == "indicator":
