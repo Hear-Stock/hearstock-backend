@@ -46,7 +46,6 @@ def parse_intent(req: TextRequest):
             "path": f"/api/stock/ws/trade-price"
         }
 
-
     elif intent == "indicator":
         code = parsed.get("code")
         name = parsed.get("name")
