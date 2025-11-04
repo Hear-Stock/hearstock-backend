@@ -34,7 +34,6 @@ def extract_intent(text: str):
     - "1년", "1년치", "작년부터" → "1y"
     - "5년", "5년치" → "5y"
     - "전체", "처음부터", "모든 기간" → "max"
-    - 기간 언급이 없으면 기본값 "3mo"
 
     보조지표(indicator) 종류 매핑:
     - "PER", "주가수익비율" → "per"
@@ -47,54 +46,34 @@ def extract_intent(text: str):
     - "목표주가" → "target_price"
     - "투자의견" → "opinion"
     - "외국인소진율" → "foreign_ownership"
-    - 사용자가 "보조지표 알려줘" 처럼 특정 지표를 언급하지 않으면 "indicator_type"은 null 또는 미포함.
+    - 사용자가 "보조지표 알려줘"처럼 특정 지표를 언급하지 않으면 indicator_type은 null 또는 미포함.
+
+    추가 규칙:
+    - "realtime_chart"는 intent의 한 종류이며, period가 아니다.
+    - 사용자가 "주식 보여줘", "차트 보여줘", "그래프", "흐름", "추이" 등의 시각적 표현을 사용하면 intent="chart"로 분류.
+    - 단, 사용자가 기간을 언급하지 않았다면 intent="realtime_chart"로 분류해야 한다.
+    - "현재가", "가격", "얼마", "시세" 등 직접적인 가격 문의 표현은 intent="current_price"로 분류.
 
     예시:
-    "삼성전자 1년치 주식 차트 보여줘" →
+    "삼성전자 3개월치 주식 보여줘" →
     {
       "name": "삼성전자",
       "code": "005930.KS",
       "market": "KR",
       "intent": "chart",
-      "period": "1y"
+      "period": "3mo"
     }
 
-    "에코프로 현재가 알려줘" →
+    "삼성전자 주식 보여줘" →
     {
-      "name": "에코프로",
-      "code": "086520.KQ",
+      "name": "삼성전자",
+      "code": "005930.KS",
       "market": "KR",
-      "intent": "current_price"
+      "intent": "realtime_chart"
     }
 
-    "카카오 PER 알려줘" →
-    {
-      "name": "카카오",
-      "code": "035720.KS",
-      "market": "KR",
-      "intent": "indicator",
-      "indicator_type": "per"
-    }
-
-    "네이버 투자지표 보여줘" →
-    {
-        "name": "네이버",
-        "code": "035420.KS",
-        "market": "KR",
-        "intent": "indicator"
-    }
-
-    "미국 달러 환율 알려줘" →
-    {
-      "intent": "exchange_rate",
-      "country": "미국"
-    }
-
-    "코스피 지수 어때?" →
-    {
-      "intent": "market_index",
-      "market_name": "코스피"
-    }
+    주의사항:
+    - 사용자가 "하루", "3개월", "1년" 등 기간을 직접 말하지 않았다면 절대 "period" 값을 생성하지 마라.
 
     JSON 외에 아무 설명도 하지 마세요.
     """
@@ -108,30 +87,30 @@ def extract_intent(text: str):
     )
 
     result = response.choices[0].message.content.strip()
+
     try:
-        # 모델의 응답에서 JSON 부분만 추출
+        # JSON만 추출
         json_start = result.find('{')
         json_end = result.rfind('}') + 1
         if json_start == -1 or json_end == 0:
-            return None # 응답에서 JSON 객체를 찾지 못한 경우
-            
-        json_string = result[json_start:json_end]
-        parsed = json.loads(json_string)
+            return None
 
-        # chart인데 기간 언급이 없으면 실시간 차트로 변경
-        if parsed.get("intent") == "chart" and not parsed.get("period"):
+        parsed = json.loads(result[json_start:json_end])
+
+        # period=realtime_chart로 반환한 경우 보정
+        if parsed.get("intent") == "chart" and parsed.get("period") == "realtime_chart":
             parsed["intent"] = "realtime_chart"
+            parsed.pop("period", None)
 
-        # indicator일 때는 prefix 제거
-        if parsed.get("intent") == "indicator":
-            if "code" in parsed:
-                parsed["code"] = parsed["code"].split('.')[0]
+        # indicator일 때 code 접미사 제거
+        if parsed.get("intent") == "indicator" and "code" in parsed:
+            parsed["code"] = parsed["code"].split('.')[0]
 
-        # 해외 주식이면 prefix 제거
+        # 해외 주식이면 접미사 제거
         if parsed.get("market") == "US" and "." in parsed.get("code", ""):
-            if "code" in parsed:
-                parsed["code"] = parsed["code"].split('.')[0]
+            parsed["code"] = parsed["code"].split('.')[0]
 
         return parsed
+
     except json.JSONDecodeError:
         return None

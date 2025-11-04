@@ -42,7 +42,7 @@ def parse_intent(req: TextRequest):
             "name": name,
             "code": code,
             "market": market,
-            "intent": "realtime_chart",
+            "intent": "current_price",
             "path": f"/api/stock/ws/trade-price"
         }
 
