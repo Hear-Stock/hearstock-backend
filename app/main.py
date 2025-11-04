@@ -9,7 +9,9 @@ add_exception_handlers(app)
 
 origins = [
     "http://localhost:7789",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "https://hearstock-frontend-react-1.vercel.app/webView",
+    "https://hearstock-frontend-react-1.vercel.app"
 ]
 
 app.add_middleware(
