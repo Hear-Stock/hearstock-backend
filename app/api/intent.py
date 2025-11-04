@@ -33,6 +33,19 @@ def parse_intent(req: TextRequest):
             "period": period,
             "path": f"/api/stock/chart?code={code}&period={period}&market={market}"
         }
+    
+    elif intent == "realtime_chart":
+        code = parsed.get("code")
+        name = parsed.get("name")
+        market = parsed.get("market", "KR")
+        return {
+            "name": name,
+            "code": code,
+            "market": market,
+            "intent": "realtime_chart",
+            "path": f"/api/stock/ws/trade-price"
+        }
+
 
     elif intent == "indicator":
         code = parsed.get("code")
