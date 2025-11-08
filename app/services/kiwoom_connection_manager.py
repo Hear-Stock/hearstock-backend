@@ -10,7 +10,8 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 
-from app.api.kiwoomREST import get_kiwoom_token
+# from app.api.kiwoomREST import get_kiwoom_token
+from app.services.kiwoom_service import get_kiwoom_token
 
 
 # socket 정보
@@ -51,11 +52,11 @@ class KiwoomConnectionManager:
         login_response = json.loads(login_response_str)
         
         if login_response.get('trnm') == 'LOGIN' and login_response.get('return_code') == 0:
-            print('Kiwoom 로그인 성공하였습니다.')
+            logging.info('Kiwoom 로그인 성공하였습니다.')
             return True
         else:
             msg = login_response.get("return_msg", "알 수 없는 로그인 오류")
-            print(f'Kiwoom 로그인 실패하였습니다: {msg}')
+            logging.error(f'Kiwoom 로그인 실패하였습니다: {msg}')
             return False
 
     async def connect(self):
@@ -63,14 +64,14 @@ class KiwoomConnectionManager:
         if self.is_running:
             return True
         try:
-            print("첫 구독자 발생. Kiwoom 서버에 연결을 시도합니다...")
-            self.kiwoom_ws = await websockets.connect(SOCKET_URL)
-            print("Kiwoom WebSocket 서버에 연결되었습니다.")
+            logging.info("첫 구독자 발생. Kiwoom 서버에 연결을 시도합니다...")
+            self.kiwoom_ws = await websockets.connect(SOCKET_URL, open_timeout=10)
+            logging.info("Kiwoom WebSocket 서버에 연결되었습니다.")
 
             if await self._login_to_kiwoom():
                 self.is_running = True
                 self.reader_task = asyncio.create_task(self._kiwoom_reader_task())
-                print("Kiwoom 연결이 수립되었고, 데이터 리더 작업을 시작합니다.")
+                logging.info("Kiwoom 연결이 수립되었고, 데이터 리더 작업을 시작합니다.")
                 # 재연결 시, 기존 구독 재등록
                 await self._resubscribe_all()
                 return True
@@ -78,7 +79,7 @@ class KiwoomConnectionManager:
                 await self.kiwoom_ws.close()
                 return False
         except Exception as e:
-            print(f"Kiwoom 연결 관리 중 예기치 않은 오류 발생: {e}")
+            logging.error(f"Kiwoom 연결 관리 중 예기치 않은 오류 발생: {e}")
             self.is_running = False
             return False
 
@@ -87,7 +88,7 @@ class KiwoomConnectionManager:
         if not self.is_running:
             return
         
-        print("마지막 구독자 이탈. Kiwoom 서버와의 연결을 종료합니다.")
+        logging.info("마지막 구독자 이탈. Kiwoom 서버와의 연결을 종료합니다.")
         self.is_running = False
         
         if self.reader_task:
@@ -97,9 +98,9 @@ class KiwoomConnectionManager:
         if self.kiwoom_ws and self.kiwoom_ws.protocol.state != State.CLOSED:
             try:
                 await self.kiwoom_ws.close()
-                print("Kiwoom WebSocket 연결이 성공적으로 종료되었습니다.")
+                logging.info("Kiwoom WebSocket 연결이 성공적으로 종료되었습니다.")
             except Exception as e:
-                print(f"Kiwoom WebSocket 연결 종료 중 오류 발생: {e}")
+                logging.error(f"Kiwoom WebSocket 연결 종료 중 오류 발생: {e}")
         
         # 모든 구독 정보 초기화 (연결이 끊겼으므로)
         self.stock_to_grp.clear()
@@ -111,7 +112,7 @@ class KiwoomConnectionManager:
         """서버 재연결 시, 기존에 클라이언트들이 구독하고 있던 모든 종목을 재등록합니다."""
         # stock_to_grp에 있는 모든 종목에 대해 다시 REG 요청
         for stock_code, grp_no in self.stock_to_grp.items():
-            print(f"재구독: {stock_code} (grp_no: {grp_no})")
+            logging.info(f"재구독: {stock_code} (grp_no: {grp_no})")
             reg_msg = {
                 'trnm': 'REG',
                 'grp_no': grp_no,
@@ -121,17 +122,18 @@ class KiwoomConnectionManager:
             try:
                 await self.kiwoom_ws.send(json.dumps(reg_msg))
             except Exception as e:
-                print(f"{stock_code} 재구독 실패: {e}")
+                logging.warning(f"{stock_code} 재구독 실패: {e}")
 
 
     async def _kiwoom_reader_task(self):
         """Kiwoom API로부터 오는 메시지를 계속 읽고 클라이언트에게 배포합니다."""
-        print("Kiwoom 데이터 리더 작업을 시작합니다.")
+        logging.info("Kiwoom 데이터 리더 작업을 시작합니다.")
         try:
             while self.is_running:
                 message = await self.kiwoom_ws.recv()
                 data = json.loads(message)
-                print(self.subscriptions)
+                # logging.debug(f"Current subscriptions: {self.subscriptions}")
+                
                 if data.get('trnm') == 'PING':
                     await self.kiwoom_ws.send(message)
                     continue
@@ -147,7 +149,13 @@ class KiwoomConnectionManager:
                             전일대비 = float(tick_info_map.get('11', 0))
                             등락률 = float(tick_info_map.get('12', 0))
                             체결량 = int(tick_info_map.get('15', 0))
-                            logging.info(f"--- 실시간 체결 정보 ---\n체결시간: {체결시간}\n현재가: {현재가}\n전일대비: {전일대비}\n등락률: {등락률}\n체결량: {체결량}\n--------------------")
+                            logging.debug(f"""--- 실시간 체결 정보 ---
+                            체결시간: {체결시간}
+                            현재가: {현재가}
+                            전일대비: {전일대비}
+                            등락률: {등락률}
+                            체결량: {체결량}
+                            --------------------""")
                             
                             trade_info = {
                                 "stock_code": current_stock_code,
@@ -160,75 +168,76 @@ class KiwoomConnectionManager:
                             
                             
                             new_message = json.dumps(trade_info)
-                            print(new_message)
-                            print(self.subscriptions[current_stock_code+".KS"])
                             await asyncio.gather(*[
                                 client.send_text(new_message)
-                                for client in self.subscriptions[current_stock_code+".KS"] # 임시로 .KS 추가
+                                for client in self.subscriptions[current_stock_code.split('.')[0]]
                             ])
         except ConnectionClosed:
-            print("리더 작업 중 Kiwoom 연결이 끊겼습니다.")
+            logging.warning("리더 작업 중 Kiwoom 연결이 끊겼습니다.")
         except asyncio.CancelledError:
-            print("리더 작업이 정상적으로 취소되었습니다.")
+            logging.info("리더 작업이 정상적으로 취소되었습니다.")
         except Exception as e:
-            print(f"리더 작업 중 오류 발생: {e}")
+            logging.error(f"리더 작업 중 오류 발생: {e}")
         finally:
             self.is_running = False
-            print("Kiwoom 데이터 리더 작업을 종료합니다.")
+            logging.info("Kiwoom 데이터 리더 작업을 종료합니다.")
 
 
     async def subscribe(self, client_ws: WebSocket, stock_code: str):
         """클라이언트의 종목 구독 요청을 처리합니다."""
         async with self.lock:
+            stock_code = stock_code.split('.')[0]
             # 첫 구독자라면 Kiwoom에 연결
             if not self.is_running:
                 if not await self.connect():
                     await client_ws.send_json({"status": "error", "detail": "Kiwoom 서버 연결에 실패했습니다."})
                     return
-
+            
             is_first_subscription_for_stock = not self.subscriptions[stock_code]
             self.subscriptions[stock_code].add(client_ws)
-            print(f"Client {client_ws} subscribed to {stock_code}. Total subscribers: {len(self.subscriptions[stock_code])}")
+            logging.info(f"Client {client_ws} subscribed to {stock_code}. Total subscribers: {len(self.subscriptions[stock_code])}")
 
             if is_first_subscription_for_stock:
                 grp_no = self._generate_grp_no()
+                
                 self.stock_to_grp[stock_code] = grp_no
                 self.grp_to_stock[grp_no] = stock_code
                 
-                print(f"First subscription for {stock_code}. Assigning grp_no: {grp_no}")
+                logging.info(f"First subscription for {stock_code}. Assigning grp_no: {grp_no}")
 
                 reg_msg = {
                     'trnm': 'REG',
                     'grp_no': grp_no,
                     'refresh': '1',
-                    'data': [{'item': [stock_code.split('.')[0]], 'type': ['0B']}]
+                    'data': [{'item': [stock_code], 'type': ['0B']}]
                 }
                 if self.is_running and self.kiwoom_ws.protocol.state != State.CLOSED:
                     await self.kiwoom_ws.send(json.dumps(reg_msg))
                 else:
-                    print("Kiwoom이 연결되지 않아 구독 요청을 보낼 수 없습니다.")
+                    logging.warning("Kiwoom이 연결되지 않아 구독 요청을 보낼 수 없습니다.")
 
     async def unsubscribe(self, client_ws: WebSocket, stock_code: str):
         """클라이언트의 종목 구독 해지 요청을 처리합니다."""
         async with self.lock:
+            stock_code = stock_code.split('.')[0]
             if client_ws not in self.subscriptions.get(stock_code, set()):
                 return
 
             self.subscriptions[stock_code].remove(client_ws)
-            print(f"Client {client_ws} unsubscribed from {stock_code}.")
+            logging.info(f"Client {client_ws} unsubscribed from {stock_code}.")
 
             if not self.subscriptions[stock_code]:
                 del self.subscriptions[stock_code]
                 grp_no = self.stock_to_grp.pop(stock_code, None)
                 if grp_no:
                     self.grp_to_stock.pop(grp_no, None)
-                    print(f"All clients for {stock_code} unsubscribed. Removing grp_no: {grp_no}")
+                    logging.info(f"All clients for {stock_code} unsubscribed. Removing grp_no: {grp_no}")
 
                     remove_msg = {'trnm': 'REMOVE', 'grp_no': grp_no}
                     if self.is_running and self.kiwoom_ws.protocol.state != State.CLOSED:
                         await self.kiwoom_ws.send(json.dumps(remove_msg))
                     else:
-                        print("Kiwoom이 연결되지 않아 구독 해지 요청을 보낼 수 없습니다.")
+                        logging.warning("Kiwoom이 연결되지 않아 구독 해지 요청을 보낼 수 없습니다.")
             
             # 마지막 구독자였는지 확인
             if not any(self.subscriptions.values()):

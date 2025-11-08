@@ -175,27 +175,28 @@ async def websocket_trade_price(websocket: WebSocket):
         while True:
             # 클라이언트로부터 메시지(예: 구독/구독 취소)를 기다립니다.
             message_text = await websocket.receive_text()
+            logging.info(f"Received WebSocket message from client {websocket}: {message_text}")
             data = json.loads(message_text)
             action = data.get('action')
             stock_code = data.get('code')
 
             if action == 'subscribe' and stock_code:
+                logging.info(f"Client {websocket} subscribing to {stock_code}")
                 await manager.subscribe(websocket, stock_code)
             elif action == 'unsubscribe' and stock_code:
+                logging.info(f"Client {websocket} unsubscribing from {stock_code}")
                 await manager.unsubscribe(websocket, stock_code)
             else:
                 # 선택 사항: 알 수 없는 작업에 대한 오류를 다시 보냅니다.
-                await websocket.send_json({
-                    "status": "error",
-                    "detail": f"Unknown action '{action}' or missing code."
-                })
+                error_message = {"status": "error", "detail": f"Unknown action '{action}' or missing code."}
+                logging.warning(f"Sending error to client {websocket}: {error_message}")
+                await websocket.send_json(error_message)
 
     except WebSocketDisconnect:
-        print(f"Client {websocket} disconnected.")
+        logging.info(f"Client {websocket} disconnected.")
     except Exception as e:
-        print(f"An error occurred with client {websocket}: {e}")
+        logging.error(f"An error occurred with client {websocket}: {e}")
     finally:
         # 클라이언트 연결이 끊어지면 구독을 정리합니다.
         await manager.handle_disconnect(websocket)
-        print(f"Cleaned up subscriptions for client {websocket}.")
-
+        logging.info(f"Cleaned up subscriptions for client {websocket}.")
