@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # 포매터 생성
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s | %(levelname)-8s | %(name)s | [%(filename)s:%(lineno)d] - %(message)s')
 
 # 스트림 핸들러 (콘솔 출력)
 stream_handler = logging.StreamHandler()
@@ -50,10 +50,18 @@ async def log_requests_and_errors(request: Request, call_next):
         process_time = time.time() - start_time
         
         # 클라이언트 IP, 요청 메소드, 경로, 응답 코드, 처리 시간을 로그로 남김
-        logger.info(
+        log_message = (
             f"client: {request.client.host} - \"{request.method} {request.url.path}\" "
             f"{response.status_code} | process_time: {process_time:.4f}s"
         )
+        
+        if response.status_code >= 500:
+            logger.error(log_message)
+        elif response.status_code >= 400:
+            logger.warning(log_message)
+        else:
+            logger.info(log_message)
+            
         return response
 
     except Exception as e:
