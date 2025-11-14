@@ -61,7 +61,10 @@ def get_chart_by_query(
     if not validate_market_match(code, final_market):
         raise StockAPIException(status_code=400, detail=f"종목 코드 '{code}'와 시장 '{final_market}'이(가) 일치하지 않습니다.")
 
-    return get_stock_chart(code, period, final_market)
+    chart_data = get_stock_chart(code, period, final_market)
+    if not chart_data:
+        raise StockAPIException(status_code=404, detail="잘못된 요청입니다.")
+    return chart_data
 
 @router.post("/chart/direct")
 def get_chart_direct(req: ChartDirectRequest):
