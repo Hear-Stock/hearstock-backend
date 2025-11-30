@@ -4,6 +4,7 @@ import logging.config
 import traceback
 import os
 import uuid
+import json
 from pythonjsonlogger import jsonlogger
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -73,6 +74,13 @@ async def log_requests_and_errors(request: Request, call_next):
     request_id = str(uuid.uuid4())
     start_time = time.time()
     
+    request_body = await request.body()
+    
+    async def receive():
+        return {"type": "http.request", "body": request_body}
+    
+    request = Request(request.scope, receive)
+
     try:
         response = await call_next(request)
         process_time = time.time() - start_time
@@ -81,10 +89,18 @@ async def log_requests_and_errors(request: Request, call_next):
             "request_id": request_id,
             "client": request.client.host,
             "method": request.method,
-            "url": str(request.url),  # .path 대신 전체 URL을 기록하도록 변경
+            "url": str(request.url),
+            "query_params": str(request.query_params), # 쿼리 파라미터 추가
             "status_code": response.status_code,
             "process_time_seconds": f"{process_time:.4f}",
         }
+        
+        # 요청 본문이 있는 경우 로그에 추가 (JSON 형식 시도)
+        if request_body:
+            try:
+                log_details["request_body"] = json.loads(request_body)
+            except json.JSONDecodeError:
+                log_details["request_body"] = request_body.decode(errors='ignore')
 
         if response.status_code >= 500:
             logger.error("Request finished with server error", extra=log_details)
@@ -101,12 +117,21 @@ async def log_requests_and_errors(request: Request, call_next):
             "request_id": request_id,
             "client": request.client.host,
             "method": request.method,
-            "url": str(request.url),  # .path 대신 전체 URL을 기록하도록 변경
+            "url": str(request.url),
+            "query_params": str(request.query_params), # 쿼리 파라미터 추가
             "process_time_seconds": f"{process_time:.4f}",
             "error_type": type(e).__name__,
             "error_message": str(e),
             "traceback": traceback.format_exc().splitlines(),
         }
+        
+        # 요청 본문이 있는 경우 에러 로그에 추가
+        if request_body:
+            try:
+                error_details["request_body"] = json.loads(request_body)
+            except json.JSONDecodeError:
+                error_details["request_body"] = request_body.decode(errors='ignore')
+                
         logger.error("Unhandled exception", extra=error_details)
         
         return JSONResponse(
