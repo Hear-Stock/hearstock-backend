@@ -12,3 +12,4 @@ apscheduler
 yfinance==0.2.59
 redis>=5.0.0
 python-dotenv
+python-json-logger
