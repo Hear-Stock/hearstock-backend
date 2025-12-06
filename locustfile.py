@@ -3,32 +3,69 @@ from app.data.getCodes import getKospiCodes
 import random
 
 class StockApiUser(HttpUser):
-    wait_time = between(1, 2)  # 요청 간 대기 시간 (1~2초)
+    wait_time = between(1, 2)
 
-
-    kospi_codes = getKospiCodes("app/data/kospi100.csv")
-    codes = list(kospi_codes.keys())
-    # codes = ["005930", "000660", "207940"]
-
-    @task(0)
-    def get_stock_chart(self):
-        code = random.choice(self.codes)
+    def on_start(self):
+        codes_dict = getKospiCodes("app/data/kospi100.csv")
+        self.codes = [f"{code}.KS" for code in codes_dict.keys()]
+        self.countries = ["미국", "일본", "중국", "유럽연합"]
         
-        
-        # GET 요청 보내기
+        if not self.codes:
+            print("Error: 종목 코드를 불러오지 못했습니다. 경로를 확인하세요.")
+            self.stop()
+
+    @task(5)
+    def get_current_price(self):
+        code = random.choice(self.codes).split('.')[0]
         self.client.get(
-            "/api/stk/stkchart",
-            params={"code": code}
+            "/api/stock/price",
+            params={"code": code, "intent": "current_price", "market": "KR"},
+            name="/api/stock/price?intent=current_price"
         )
 
-    @task
-    def get_stock_chart_nocache(self):
+    @task(3)
+    def get_3month_chart(self):
         code = random.choice(self.codes)
-        
-        # GET 요청 보내기
         self.client.get(
-            "/api/stk/kiwoomStockChart",
-            params={"code": code}
+            "/api/stock/chart",
+            params={"code": code, "period": "3mo", "market": "KR"},
+            name="/api/stock/chart?period=3mo"
+        )
+
+    @task(1)
+    def get_1year_chart(self):
+        code = random.choice(self.codes)
+        self.client.get(
+            "/api/stock/chart",
+            params={"code": code, "period": "1y", "market": "KR"},
+            name="/api/stock/chart?period=1y"
+        )
+
+    @task(2)
+    def get_market_indices(self):
+        market = random.choice(["kospi", "kosdaq"])
+        self.client.get(
+            "/api/investment/indices",
+            params={"market": market},
+            name="/api/investment/indices"
+        )
+
+    @task(1)
+    def get_exchange_rate(self):
+        country = random.choice(self.countries)
+        self.client.get(
+            "/api/investment/exchange",
+            params={"contry": country},
+            name="/api/investment/exchange"
+        )
+
+    @task(3)
+    def get_all_indicators(self):
+        code = random.choice(self.codes).split('.')[0]
+        self.client.get(
+            "/api/indicator/",
+            params={"code": code, "market": "KR"},
+            name="/api/indicator/"
         )
 
     
